@@ -1,29 +1,38 @@
-# Ping Pong Web Game
+# Ping Pong Animation Demo
 
-## Description
-A simple 2D ping pong game served by a Node.js backend using Express.js and HTML5 Canvas.
+A visually appealing ping pong animation featuring realistic physics and automatic gameplay.
+
+## Features
+- Realistic ball physics with gravity effects
+- AI-controlled paddles with trajectory anticipation
+- Particle effects on ball impacts
+- Responsive design with Tailwind CSS
+- High-DPI display support
 
 ## Installation
+
 1. Navigate to the server directory:
-   ```
-   cd server
-   ```
+```bash
+cd server
+```
+
 2. Install dependencies:
-   ```
-   npm install
-   ```
+```bash
+npm install
+```
+
 3. Start the server:
-   ```
-   npm start
-   ```
+```bash
+npm start
+```
 
-## How to Play
-- Use Arrow Keys or WASD to move the paddle
-- Prevent the ball from passing your paddle
-- Score points by making the ball pass the opponent's paddle
+The application will be available at `http://localhost:3000`.
 
-## Future Enhancements
-- Improved AI paddle movement
-- More advanced graphics
-- Mobile controls
-- Multiplayer functionality
+## Preview
+![Ping Pong Demo](preview.png)
+
+## Tech Stack
+- HTML5 Canvas
+- Tailwind CSS
+- JavaScript (ES6+)
+- Node.js (server)

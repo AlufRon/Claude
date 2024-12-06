@@ -2,11 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Ping Pong Game</title>
-    <link rel="stylesheet" href="/styles/main.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping Pong Animation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
 </head>
-<body>
-    <canvas id="gameCanvas" width="800" height="400"></canvas>
-    <script src="/scripts/game.js"></script>
+<body class="bg-gray-900 min-h-screen flex flex-col items-center justify-center">
+    <div class="scoreboard mb-8 font-inter text-2xl text-white">
+        <span class="px-4">Player A: 10</span>
+        <span class="border-l border-gray-500 px-4">Player B: 12</span>
+    </div>
+    
+    <div class="table-container relative bg-gradient-to-b from-green-600 to-green-700 rounded-lg shadow-2xl overflow-hidden">
+        <div class="absolute inset-0 flex justify-center">
+            <div class="w-px bg-white opacity-50 h-full"></div>
+        </div>
+        <canvas id="gameCanvas" class="relative z-10"></canvas>
+    </div>
+
+    <script src="scripts/utils.js"></script>
+    <script src="scripts/game.js"></script>
 </body>
 </html>
