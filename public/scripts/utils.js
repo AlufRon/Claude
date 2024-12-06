@@ -9,7 +9,7 @@ function createProjectionMatrix(aspect, fov = CAMERA.FOV, near = 0.1, far = 10.0
     ];
 }
 
-function project3Dto2D(point, projectionMatrix) {
+function project3Dto2D(point, projectionMatrix, canvas) {
     // Transform world coordinates to camera space
     const camX = point.x - CAMERA.POSITION.x;
     const camY = point.y - CAMERA.POSITION.y;
@@ -28,24 +28,15 @@ function project3Dto2D(point, projectionMatrix) {
     };
 }
 
-// Drawing utilities
-function drawPaddleShape(ctx, x, y, scale, isRed) {
-    const headRadius = PADDLE.HEAD_DIAMETER * scale / 2;
-    const handleLength = PADDLE.HANDLE_LENGTH * scale;
-    const handleWidth = PADDLE.HANDLE_WIDTH * scale;
+// Math utilities
+function lerp(start, end, t) {
+    return start * (1 - t) + end * t;
+}
 
-    // Draw paddle head
-    ctx.beginPath();
-    ctx.arc(x, y, headRadius, 0, Math.PI * 2);
-    ctx.fillStyle = isRed ? COLORS.PADDLE_RED : COLORS.PADDLE_BLACK;
-    ctx.fill();
-    
-    // Draw handle
-    ctx.fillStyle = COLORS.PADDLE_HANDLE;
-    ctx.fillRect(x - handleWidth/2, y, handleWidth, handleLength);
-    
-    // Draw edge detail
-    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+function easeInOutQuad(t) {
+    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+}
+
+function randomRange(min, max) {
+    return Math.random() * (max - min) + min;
 }
