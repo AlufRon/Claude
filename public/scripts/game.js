@@ -3,6 +3,7 @@ class PingPongGame {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.setupCanvas();
+        this.projectionMatrix = createProjectionMatrix(canvas.width / canvas.height);
         this.initializeGame();
         requestAnimationFrame(this.gameLoop.bind(this));
     }
@@ -17,177 +18,105 @@ class PingPongGame {
         this.canvas.style.height = `${rect.height}px`;
     }
 
-    initializeGame() {
-        this.tableDepth = 200;
-        
-        this.ball = {
-            x: this.canvas.width / 2,
-            y: this.canvas.height / 2,
-            z: 0,
-            radius: 10,
-            dx: 7,
-            dy: 0,
-            dz: 2
-        };
+    drawTable() {
+        const tablePoints = [
+            { x: 0, y: TABLE.HEIGHT, z: 0 },
+            { x: TABLE.LENGTH, y: TABLE.HEIGHT, z: 0 },
+            { x: TABLE.LENGTH, y: TABLE.HEIGHT, z: TABLE.WIDTH },
+            { x: 0, y: TABLE.HEIGHT, z: TABLE.WIDTH }
+        ];
 
-        this.paddles = {
-            left: {
-                x: 60,
-                y: this.canvas.height / 2,
-                z: 0,
-                width: 20,
-                height: 100,
-                color: '#e74c3c'
-            },
-            right: {
-                x: this.canvas.width - 60,
-                y: this.canvas.height / 2,
-                z: 0,
-                width: 20,
-                height: 100,
-                color: '#3498db'
-            }
-        };
-    }
+        // Project table corners
+        const projectedPoints = tablePoints.map(p => 
+            project3Dto2D(p, this.projectionMatrix));
 
-    update() {
-        this.updateBall();
-        this.updatePaddles();
-    }
-
-    updateBall() {
-        // Update position
-        this.ball.x += this.ball.dx;
-        this.ball.y += this.ball.dy;
-        this.ball.z += this.ball.dz;
-
-        // Add gravity
-        this.ball.dy += 0.3;
-
-        // Table bounds
-        if (this.ball.y > this.canvas.height - this.ball.radius) {
-            this.ball.y = this.canvas.height - this.ball.radius;
-            this.ball.dy *= -0.8;
-        }
-
-        // Z-axis bounds
-        if (Math.abs(this.ball.z) > this.tableDepth/2) {
-            this.ball.z = Math.sign(this.ball.z) * this.tableDepth/2;
-            this.ball.dz *= -1;
-        }
-
-        // Check for paddle hits
-        this.checkPaddleCollisions();
-
-        // Reset if out of bounds
-        if (this.ball.x < 0 || this.ball.x > this.canvas.width) {
-            this.resetBall();
-        }
-    }
-
-    checkPaddleCollisions() {
-        ['left', 'right'].forEach(side => {
-            const paddle = this.paddles[side];
-            const ballInXRange = side === 'left' ?
-                this.ball.x < paddle.x + paddle.width :
-                this.ball.x > paddle.x - paddle.width;
-
-            if (ballInXRange &&
-                Math.abs(this.ball.y - paddle.y) < paddle.height/2 &&
-                Math.abs(this.ball.z - paddle.z) < 30) {
-                
-                this.ball.dx *= -1.1;
-                this.ball.dz = (Math.random() - 0.5) * 8;
-                this.ball.x = side === 'left' ? 
-                    paddle.x + paddle.width + this.ball.radius :
-                    paddle.x - paddle.width - this.ball.radius;
-            }
+        // Draw table surface
+        this.ctx.beginPath();
+        this.ctx.moveTo(projectedPoints[0].x, projectedPoints[0].y);
+        projectedPoints.slice(1).forEach(p => {
+            this.ctx.lineTo(p.x, p.y);
         });
+        this.ctx.closePath();
+
+        // Fill with gradient
+        const gradient = this.ctx.createLinearGradient(
+            projectedPoints[0].x, projectedPoints[0].y,
+            projectedPoints[2].x, projectedPoints[2].y
+        );
+        gradient.addColorStop(0, COLORS.TABLE_GREEN);
+        gradient.addColorStop(1, '#0D470F');
+        this.ctx.fillStyle = gradient;
+        this.ctx.fill();
+
+        // Draw table border
+        this.ctx.strokeStyle = COLORS.TABLE_BORDER;
+        this.ctx.lineWidth = TABLE.BORDER_WIDTH * projectedPoints[0].scale;
+        this.ctx.stroke();
+
+        // Draw legs
+        this.drawTableLegs(projectedPoints);
     }
 
-    updatePaddles() {
-        ['left', 'right'].forEach(side => {
-            const paddle = this.paddles[side];
-            
-            // AI movement
-            const targetY = this.ball.dx * (side === 'left' ? -1 : 1) > 0 ?
-                this.canvas.height / 2 :
-                this.ball.y + this.ball.dy * 15;
+    drawTableLegs(tableCorners) {
+        const legWidth = 0.05; // 5cm width
+        const legPositions = [
+            { x: legWidth, y: 0, z: legWidth },
+            { x: TABLE.LENGTH - legWidth, y: 0, z: legWidth },
+            { x: TABLE.LENGTH - legWidth, y: 0, z: TABLE.WIDTH - legWidth },
+            { x: legWidth, y: 0, z: TABLE.WIDTH - legWidth }
+        ];
 
-            paddle.y += (targetY - paddle.y) * 0.1;
+        legPositions.forEach((bottomPos, i) => {
+            const topPos = {
+                x: bottomPos.x,
+                y: TABLE.HEIGHT - TABLE.TOP_THICKNESS,
+                z: bottomPos.z
+            };
 
-            // Z movement
-            if (Math.abs(this.ball.x - paddle.x) < 200) {
-                paddle.z = Math.sin(Date.now() / 500) * this.tableDepth/4;
-            } else {
-                paddle.z *= 0.95;
-            }
+            const projBottom = project3Dto2D(bottomPos, this.projectionMatrix);
+            const projTop = project3Dto2D(topPos, this.projectionMatrix);
+
+            // Draw leg
+            this.ctx.beginPath();
+            this.ctx.moveTo(projBottom.x, projBottom.y);
+            this.ctx.lineTo(projTop.x, projTop.y);
+            this.ctx.lineWidth = legWidth * projBottom.scale * 100;
+            this.ctx.strokeStyle = '#404040';
+            this.ctx.stroke();
+
+            // Draw leg shadow
+            const shadowLength = legWidth * 2;
+            this.ctx.beginPath();
+            this.ctx.ellipse(
+                projBottom.x,
+                projBottom.y,
+                shadowLength * projBottom.scale * 100,
+                shadowLength * projBottom.scale * 50,
+                0, 0, Math.PI * 2
+            );
+            this.ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            this.ctx.fill();
         });
-    }
-
-    resetBall() {
-        this.ball.x = this.canvas.width / 2;
-        this.ball.y = this.canvas.height / 2;
-        this.ball.z = 0;
-        this.ball.dy = 0;
-        this.ball.dx *= -1;
-        this.ball.dz = (Math.random() - 0.5) * 4;
     }
 
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw paddles
-        ['left', 'right'].forEach(side => {
-            const paddle = this.paddles[side];
-            const projected = project3Dto2D(paddle.x, paddle.y, paddle.z);
-            
-            // Draw shadow
-            createShadow(
-                this.ctx,
-                paddle.x,
-                paddle.y + paddle.height/2,
-                paddle.width * projected.scale,
-                paddle.height * projected.scale
-            );
-
-            // Draw paddle
-            this.ctx.fillStyle = paddle.color;
-            this.ctx.fillRect(
-                projected.x - (paddle.width * projected.scale)/2,
-                projected.y - (paddle.height * projected.scale)/2,
-                paddle.width * projected.scale,
-                paddle.height * projected.scale
-            );
-        });
-
-        // Draw ball
-        const ballProjected = project3Dto2D(this.ball.x, this.ball.y, this.ball.z);
-        
-        // Ball shadow
-        createShadow(
-            this.ctx,
-            this.ball.x,
-            this.ball.y + this.ball.radius,
-            this.ball.radius * 2 * ballProjected.scale,
-            this.ball.radius * 2 * ballProjected.scale
+        // Draw floor (simple gradient)
+        const floorGradient = this.ctx.createLinearGradient(
+            0, this.canvas.height,
+            0, this.canvas.height * 0.7
         );
+        floorGradient.addColorStop(0, '#1a1a1a');
+        floorGradient.addColorStop(1, '#2d2d2d');
+        this.ctx.fillStyle = floorGradient;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Ball
-        this.ctx.beginPath();
-        this.ctx.arc(
-            ballProjected.x,
-            ballProjected.y,
-            this.ball.radius * ballProjected.scale,
-            0,
-            Math.PI * 2
-        );
-        this.ctx.fillStyle = '#fff';
-        this.ctx.fill();
+        this.drawTable();
+        // Other draw calls will be added in next steps
     }
 
     gameLoop() {
-        this.update();
         this.draw();
         requestAnimationFrame(this.gameLoop.bind(this));
     }
