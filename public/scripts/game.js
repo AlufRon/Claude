@@ -1,199 +1,99 @@
 class PingPongGame {
-    constructor(canvas) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
-        this.setupCanvas();
-        this.initializeGame();
-        requestAnimationFrame(this.gameLoop.bind(this));
-    }
+    // Previous code remains the same...
 
-    setupCanvas() {
-        const dpr = window.devicePixelRatio || 1;
-        const rect = this.canvas.getBoundingClientRect();
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
-        this.ctx.scale(dpr, dpr);
-        this.canvas.style.width = `${rect.width}px`;
-        this.canvas.style.height = `${rect.height}px`;
-    }
+    drawNet() {
+        const netHeight = 0.15; // 15cm
+        const netPoints = [
+            { x: TABLE.LENGTH/2, y: TABLE.HEIGHT, z: 0 },
+            { x: TABLE.LENGTH/2, y: TABLE.HEIGHT + netHeight, z: 0 },
+            { x: TABLE.LENGTH/2, y: TABLE.HEIGHT + netHeight, z: TABLE.WIDTH },
+            { x: TABLE.LENGTH/2, y: TABLE.HEIGHT, z: TABLE.WIDTH }
+        ];
 
-    initializeGame() {
-        this.tableDepth = 200;
-        
-        this.ball = {
-            x: this.canvas.width / 2,
-            y: this.canvas.height / 2,
-            z: 0,
-            radius: 10,
-            dx: 7,
-            dy: 0,
-            dz: 2
-        };
+        const projectedPoints = netPoints.map(p => 
+            project3Dto2D(p, this.projectionMatrix));
 
-        this.paddles = {
-            left: {
-                x: 60,
-                y: this.canvas.height / 2,
-                z: 0,
-                width: 20,
-                height: 100,
-                color: '#e74c3c'
-            },
-            right: {
-                x: this.canvas.width - 60,
-                y: this.canvas.height / 2,
-                z: 0,
-                width: 20,
-                height: 100,
-                color: '#3498db'
-            }
-        };
-    }
+        // Draw net mesh pattern
+        const meshSize = 0.02; // 2cm mesh
+        const verticalLines = Math.ceil(TABLE.WIDTH / meshSize);
+        const horizontalLines = Math.ceil(netHeight / meshSize);
 
-    update() {
-        this.updateBall();
-        this.updatePaddles();
-    }
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        this.ctx.lineWidth = 1;
 
-    updateBall() {
-        // Update position
-        this.ball.x += this.ball.dx;
-        this.ball.y += this.ball.dy;
-        this.ball.z += this.ball.dz;
+        // Vertical lines
+        for (let i = 0; i <= verticalLines; i++) {
+            const topPoint = project3Dto2D({
+                x: TABLE.LENGTH/2,
+                y: TABLE.HEIGHT + netHeight,
+                z: i * meshSize
+            }, this.projectionMatrix);
+            const bottomPoint = project3Dto2D({
+                x: TABLE.LENGTH/2,
+                y: TABLE.HEIGHT,
+                z: i * meshSize
+            }, this.projectionMatrix);
 
-        // Add gravity
-        this.ball.dy += 0.3;
-
-        // Table bounds
-        if (this.ball.y > this.canvas.height - this.ball.radius) {
-            this.ball.y = this.canvas.height - this.ball.radius;
-            this.ball.dy *= -0.8;
+            this.ctx.beginPath();
+            this.ctx.moveTo(topPoint.x, topPoint.y);
+            this.ctx.lineTo(bottomPoint.x, bottomPoint.y);
+            this.ctx.stroke();
         }
 
-        // Z-axis bounds
-        if (Math.abs(this.ball.z) > this.tableDepth/2) {
-            this.ball.z = Math.sign(this.ball.z) * this.tableDepth/2;
-            this.ball.dz *= -1;
+        // Horizontal lines
+        for (let i = 0; i <= horizontalLines; i++) {
+            const leftPoint = project3Dto2D({
+                x: TABLE.LENGTH/2,
+                y: TABLE.HEIGHT + i * meshSize,
+                z: 0
+            }, this.projectionMatrix);
+            const rightPoint = project3Dto2D({
+                x: TABLE.LENGTH/2,
+                y: TABLE.HEIGHT + i * meshSize,
+                z: TABLE.WIDTH
+            }, this.projectionMatrix);
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(leftPoint.x, leftPoint.y);
+            this.ctx.lineTo(rightPoint.x, rightPoint.y);
+            this.ctx.stroke();
         }
 
-        // Check for paddle hits
-        this.checkPaddleCollisions();
+        // Net shadow
+        const shadowPoints = [
+            projectedPoints[0],
+            projectedPoints[3],
+            { x: projectedPoints[3].x + 10, y: projectedPoints[3].y + 5 },
+            { x: projectedPoints[0].x + 10, y: projectedPoints[0].y + 5 }
+        ];
 
-        // Reset if out of bounds
-        if (this.ball.x < 0 || this.ball.x > this.canvas.width) {
-            this.resetBall();
-        }
-    }
-
-    checkPaddleCollisions() {
-        ['left', 'right'].forEach(side => {
-            const paddle = this.paddles[side];
-            const ballInXRange = side === 'left' ?
-                this.ball.x < paddle.x + paddle.width :
-                this.ball.x > paddle.x - paddle.width;
-
-            if (ballInXRange &&
-                Math.abs(this.ball.y - paddle.y) < paddle.height/2 &&
-                Math.abs(this.ball.z - paddle.z) < 30) {
-                
-                this.ball.dx *= -1.1;
-                this.ball.dz = (Math.random() - 0.5) * 8;
-                this.ball.x = side === 'left' ? 
-                    paddle.x + paddle.width + this.ball.radius :
-                    paddle.x - paddle.width - this.ball.radius;
-            }
-        });
-    }
-
-    updatePaddles() {
-        ['left', 'right'].forEach(side => {
-            const paddle = this.paddles[side];
-            
-            // AI movement
-            const targetY = this.ball.dx * (side === 'left' ? -1 : 1) > 0 ?
-                this.canvas.height / 2 :
-                this.ball.y + this.ball.dy * 15;
-
-            paddle.y += (targetY - paddle.y) * 0.1;
-
-            // Z movement
-            if (Math.abs(this.ball.x - paddle.x) < 200) {
-                paddle.z = Math.sin(Date.now() / 500) * this.tableDepth/4;
-            } else {
-                paddle.z *= 0.95;
-            }
-        });
-    }
-
-    resetBall() {
-        this.ball.x = this.canvas.width / 2;
-        this.ball.y = this.canvas.height / 2;
-        this.ball.z = 0;
-        this.ball.dy = 0;
-        this.ball.dx *= -1;
-        this.ball.dz = (Math.random() - 0.5) * 4;
+        this.ctx.beginPath();
+        this.ctx.moveTo(shadowPoints[0].x, shadowPoints[0].y);
+        shadowPoints.slice(1).forEach(p => this.ctx.lineTo(p.x, p.y));
+        this.ctx.closePath();
+        this.ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        this.ctx.fill();
     }
 
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw paddles
-        ['left', 'right'].forEach(side => {
-            const paddle = this.paddles[side];
-            const projected = project3Dto2D(paddle.x, paddle.y, paddle.z);
-            
-            // Draw shadow
-            createShadow(
-                this.ctx,
-                paddle.x,
-                paddle.y + paddle.height/2,
-                paddle.width * projected.scale,
-                paddle.height * projected.scale
-            );
-
-            // Draw paddle
-            this.ctx.fillStyle = paddle.color;
-            this.ctx.fillRect(
-                projected.x - (paddle.width * projected.scale)/2,
-                projected.y - (paddle.height * projected.scale)/2,
-                paddle.width * projected.scale,
-                paddle.height * projected.scale
-            );
-        });
-
-        // Draw ball
-        const ballProjected = project3Dto2D(this.ball.x, this.ball.y, this.ball.z);
-        
-        // Ball shadow
-        createShadow(
-            this.ctx,
-            this.ball.x,
-            this.ball.y + this.ball.radius,
-            this.ball.radius * 2 * ballProjected.scale,
-            this.ball.radius * 2 * ballProjected.scale
-        );
-
-        // Ball
-        this.ctx.beginPath();
-        this.ctx.arc(
-            ballProjected.x,
-            ballProjected.y,
-            this.ball.radius * ballProjected.scale,
+        // Ambient lighting effect
+        const ambientGradient = this.ctx.createRadialGradient(
+            this.canvas.width * 0.5, this.canvas.height * 0.3,
             0,
-            Math.PI * 2
+            this.canvas.width * 0.5, this.canvas.height * 0.3,
+            this.canvas.width * 0.7
         );
-        this.ctx.fillStyle = '#fff';
-        this.ctx.fill();
-    }
+        ambientGradient.addColorStop(0, '#1a1a1a');
+        ambientGradient.addColorStop(1, '#0a0a0a');
+        this.ctx.fillStyle = ambientGradient;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    gameLoop() {
-        this.update();
-        this.draw();
-        requestAnimationFrame(this.gameLoop.bind(this));
+        this.drawTable();
+        this.drawNet();
+        this.drawPaddle(this.paddles.left);
+        this.drawPaddle(this.paddles.right);
+        this.drawBall();
     }
 }
-
-window.onload = () => {
-    const canvas = document.getElementById('gameCanvas');
-    new PingPongGame(canvas);
-};
