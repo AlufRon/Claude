@@ -1,30 +1,29 @@
 # Ping Pong Web Game
 
-A simple 2D Ping Pong game served by a Node.js backend.
+## Description
+A simple 2D ping pong game served by a Node.js backend using Express.js and HTML5 Canvas.
 
-## Setup
-
+## Installation
 1. Navigate to the server directory:
    ```
    cd server
    ```
-
 2. Install dependencies:
    ```
    npm install
    ```
-
 3. Start the server:
    ```
    npm start
    ```
 
-4. Open a browser and visit: `http://localhost:3000`
-
-## Game Controls
-- Use Arrow Up/Down keys to move the left paddle
+## How to Play
+- Use Arrow Keys or WASD to move the paddle
+- Prevent the ball from passing your paddle
+- Score points by making the ball pass the opponent's paddle
 
 ## Future Enhancements
-- Implement scoring system
-- Add AI paddle movement
-- Improve graphics and gameplay mechanics
+- Improved AI paddle movement
+- More advanced graphics
+- Mobile controls
+- Multiplayer functionality

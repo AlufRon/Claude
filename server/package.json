@@ -1,7 +1,7 @@
 {
   "name": "ping-pong-game",
   "version": "1.0.0",
-  "description": "2D Ping Pong Web Game",
+  "description": "A 2D Ping Pong Web Game",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
