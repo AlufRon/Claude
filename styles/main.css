@@ -1,0 +1,22 @@
+body {
+  margin: 0;
+  background: #1e1e1e;
+  font-family: sans-serif;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.scoreboard {
+  margin: 20px 0;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 5px;
+  font-weight: bold;
+}
+
+#gameCanvas {
+  display: block;
+  background: none;
+}
