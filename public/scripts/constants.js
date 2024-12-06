@@ -1,4 +1,3 @@
-// Table dimensions (in meters)
 const TABLE = {
     LENGTH: 2.74,
     WIDTH: 1.525,
@@ -7,27 +6,23 @@ const TABLE = {
     BORDER_WIDTH: 0.02,
 };
 
-// Paddle dimensions (in meters)
 const PADDLE = {
     HEAD_DIAMETER: 0.15,
     HANDLE_LENGTH: 0.10,
     HANDLE_WIDTH: 0.03,
 };
 
-// Ball dimensions
 const BALL = {
     DIAMETER: 0.04,
     INITIAL_SPEED: 5,
 };
 
-// Camera settings
 const CAMERA = {
     POSITION: { x: 1.37, y: 0.76, z: 1.0 },
-    TILT: 5 * Math.PI / 180, // 5 degrees in radians
+    TILT: 5 * Math.PI / 180,
     FOV: 60 * Math.PI / 180,
 };
 
-// Colors
 const COLORS = {
     TABLE_GREEN: '#1B5E20',
     TABLE_BORDER: '#FFFFFF',

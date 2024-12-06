@@ -3,25 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Ping Pong Animation</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles/main.css">
-</head>
-<body class="bg-gray-900 min-h-screen flex flex-col items-center justify-center p-8">
-    <div class="scoreboard mb-8 font-inter text-3xl text-white bg-gray-800 px-8 py-4 rounded-lg shadow-lg">
-        <span class="px-4">Player A: 10</span>
-        <span class="border-l-2 border-gray-600 px-4">Player B: 12</span>
-    </div>
-    
-    <div class="table-container">
-        <div class="table-3d">
-            <div class="net"></div>
-            <canvas id="gameCanvas"></canvas>
-        </div>
-    </div>
-
+    <title>3D Ping Pong</title>
+    <script src="scripts/constants.js"></script>
     <script src="scripts/utils.js"></script>
     <script src="scripts/game.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div class="scoreboard">
+        <span>Player A: 10</span>
+        <span>Player B: 12</span>
+    </div>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
 </body>
 </html>
