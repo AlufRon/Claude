@@ -3,6 +3,8 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
 import Table from './Table'
+import Paddle from './Paddle'
+import Ball from './Ball'
 import { Physics } from '@react-three/rapier'
 
 export default function Game() {
@@ -20,6 +22,9 @@ export default function Game() {
         />
         <Physics>
           <Table />
+          <Paddle position={[-1, 0.1, 0]} color="red" />
+          <Paddle position={[1, 0.1, 0]} color="blue" />
+          <Ball />
         </Physics>
         <OrbitControls />
       </Canvas>
