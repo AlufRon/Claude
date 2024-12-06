@@ -1,25 +1,22 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import Navbar from '@/components/ui/Navbar'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'PingPong Tournament',
-  description: 'Interactive 3D ping pong tournament platform',
+  description: 'Interactive ping pong tournament platform',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Navbar />
-        {children}
+        <a href="#main" className="sr-only focus:not-sr-only">
+          Skip to main content
+        </a>
+        <main id="main">{children}</main>
       </body>
     </html>
   )
