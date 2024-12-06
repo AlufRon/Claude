@@ -1,11 +1,10 @@
 'use client'
-
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Environment } from '@react-three/drei'
-import Table from './Table'
-import Paddle from './Paddle'
-import Ball from './Ball'
+import { Environment, EffectComposer, Bloom } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
+import Table from './Table'
+import Ball from './Ball'
+import Paddle from './Paddle'
 
 export default function Game() {
   return (
@@ -22,11 +21,13 @@ export default function Game() {
         />
         <Physics>
           <Table />
+          <Ball />
           <Paddle position={[-1, 0.1, 0]} color="red" />
           <Paddle position={[1, 0.1, 0]} color="blue" />
-          <Ball />
         </Physics>
-        <OrbitControls />
+        <EffectComposer>
+          <Bloom luminanceThreshold={1} intensity={2} />
+        </EffectComposer>
       </Canvas>
     </div>
   )
