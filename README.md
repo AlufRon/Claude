@@ -1,13 +1,12 @@
 # 3D Ping Pong Animation
 
-A realistic ping pong animation with perspective view and physics simulation.
+Realistic ping pong animation with side-view perspective.
 
 ## Features
-- 3D perspective view with depth perception
-- Realistic physics with gravity and spin
-- AI-controlled paddles with anticipatory movement
-- Dynamic shadows and lighting effects
-- Responsive design 
+- Side-view 3D perspective
+- Realistic paddles and physics
+- Dynamic lighting and shadows
+- Table with legs and detailed net
 
 ## Installation
 
@@ -16,5 +15,3 @@ cd server
 npm install
 npm start
 ```
-
-Visit `http://localhost:3000`
