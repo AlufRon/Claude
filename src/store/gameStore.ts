@@ -26,7 +26,7 @@ type GameState = {
 export const useGameStore = create<GameState>((set) => ({
   player1Score: 0,
   player2Score: 0,
-  isPlaying: false,
+  isPlaying: true, // Set to true by default
   isPaused: false,
   ballPosition: { x: 0, y: 0.1, z: 0 },
   ballVelocity: { x: 0, y: 0, z: 0 },
