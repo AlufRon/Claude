@@ -1,9 +1,9 @@
 'use client'
 
 import { useGameStore } from '@/store/gameStore'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Slider } from '@/components/ui/slider'
-import { Label } from '@/components/ui/label'
+import { Card, CardHeader, CardTitle, CardContent } from './card'
+import { Slider } from './slider'
+import { Label } from './label'
 
 export function BallControls() {
   const { 
