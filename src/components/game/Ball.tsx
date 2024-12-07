@@ -44,5 +44,68 @@ export default function Ball() {
       resetBall()
     }
 
-    // Handle Z-axis boundaries and resets as before...
-    // Rest of the code remains the same
+    // Ensure the ball stays within table boundaries (Z-axis)
+    if (Math.abs(pos.z) > TABLE_DEPTH) {
+      ballRef.current.setTranslation(vec3({
+        x: pos.x,
+        y: pos.y,
+        z: Math.sign(pos.z) * TABLE_DEPTH
+      }))
+      ballRef.current.setLinvel(vec3({
+        x: vel.x,
+        y: vel.y,
+        z: -vel.z * 0.5
+      }))
+    }
+
+    // Reset if ball goes too high or too low
+    if (pos.y < -0.5 || pos.y > 2) {
+      resetBall()
+    }
+  })
+
+  const resetBall = () => {
+    if (!ballRef.current) return
+    
+    const startX = -1.2  // Always start from the same side
+    ballRef.current.setTranslation(vec3({ x: startX, y: 0.3, z: 0 }))
+    directionRef.current = 1  // Reset direction
+    
+    ballRef.current.setLinvel(vec3({
+      x: INITIAL_SPEED_X,
+      y: 0.2,
+      z: 0
+    }))
+  }
+
+  useEffect(() => {
+    if (isPlaying && ballRef.current) {
+      resetBall()
+    }
+  }, [isPlaying])
+
+  return (
+    <RigidBody
+      ref={ballRef}
+      colliders={false}
+      position={[-1.2, 0.3, 0]}
+      restitution={0.95}
+      friction={0.15}
+      linearDamping={0}
+      angularDamping={0}
+      gravityScale={1.0}
+    >
+      <BallCollider args={[BALL_RADIUS]} restitution={0.95} friction={0.15} />
+      <mesh castShadow>
+        <sphereGeometry args={[BALL_RADIUS, 32, 32]} />
+        <meshStandardMaterial
+          color="white"
+          emissive="white"
+          emissiveIntensity={0.2}
+          roughness={0.2}
+          metalness={0.8}
+        />
+      </mesh>
+    </RigidBody>
+  )
+}
