@@ -16,6 +16,9 @@ export default function Paddle({ position, color, playerId }: PaddleProps) {
   const { camera, viewport } = useThree()
   const targetPosition = useRef({ x: position[0], y: position[1], z: position[2] })
   const velocity = useRef({ z: 0 })
+  
+  // Base paddle rotation based on player side
+  const baseRotation = [Math.PI * 0.15, playerId === 1 ? Math.PI * 0.2 : -Math.PI * 0.2, 0]
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -39,10 +42,10 @@ export default function Paddle({ position, color, playerId }: PaddleProps) {
     // Smooth movement using velocity
     const currentPos = paddleRef.current.translation()
     const diff = targetPosition.current.z - currentPos.z
-    velocity.current.z = diff * 10 // Adjust this multiplier for faster/slower movement
+    velocity.current.z = diff * 15 // Increased for more responsive movement
 
     // Apply damping
-    const damping = 0.8
+    const damping = 0.85
     velocity.current.z *= damping
 
     // Update position
@@ -52,7 +55,7 @@ export default function Paddle({ position, color, playerId }: PaddleProps) {
       z: currentPos.z + velocity.current.z * delta
     })
 
-    // Update store with current position
+    // Update store
     updatePaddlePosition(playerId, {
       x: currentPos.x,
       y: currentPos.y,
@@ -67,10 +70,17 @@ export default function Paddle({ position, color, playerId }: PaddleProps) {
       ref={paddleRef}
       colliders={false}
     >
-      <CuboidCollider args={[0.08, 0.08, 0.01]} restitution={0.8} friction={0.2} />
+      {/* Paddle collider */}
+      <CuboidCollider 
+        args={[0.08, 0.08, 0.01]} 
+        restitution={0.85} 
+        friction={0.2} 
+        rotation={baseRotation}
+      />
       
       {/* Paddle head */}
-      <group rotation={[Math.PI * 0.1, playerId === 1 ? Math.PI * 0.1 : -Math.PI * 0.1, 0]}>
+      <group rotation={baseRotation}>
+        {/* Main paddle body */}
         <mesh castShadow>
           <boxGeometry args={[0.15, 0.15, 0.015]} />
           <meshStandardMaterial 
@@ -101,18 +111,29 @@ export default function Paddle({ position, color, playerId }: PaddleProps) {
             metalness={0}
           />
         </mesh>
-      </group>
 
-      {/* Handle */}
-      <group rotation={[Math.PI * 0.1, playerId === 1 ? Math.PI * 0.1 : -Math.PI * 0.1, 0]}>
-        <mesh position={[0, -0.12, 0]} castShadow>
-          <cylinderGeometry args={[0.015, 0.02, 0.12, 32]} />
-          <meshStandardMaterial 
-            color="#4a4a4a"
-            roughness={0.5}
-            metalness={0.8}
-          />
-        </mesh>
+        {/* Handle */}
+        <group position={[0, -0.13, 0]}>
+          {/* Handle grip */}
+          <mesh castShadow>
+            <cylinderGeometry args={[0.015, 0.02, 0.12, 32]} />
+            <meshStandardMaterial 
+              color="#4a4a4a"
+              roughness={0.5}
+              metalness={0.8}
+            />
+          </mesh>
+
+          {/* Handle end cap */}
+          <mesh position={[0, -0.06, 0]} castShadow>
+            <cylinderGeometry args={[0.022, 0.022, 0.02, 32]} />
+            <meshStandardMaterial 
+              color="#333333"
+              roughness={0.4}
+              metalness={0.9}
+            />
+          </mesh>
+        </group>
       </group>
     </RigidBody>
   )
