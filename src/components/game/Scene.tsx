@@ -1,6 +1,7 @@
 'use client'
 import { Canvas } from '@react-three/fiber'
-import { Environment, EffectComposer, Bloom } from '@react-three/drei'
+import { Environment } from '@react-three/drei'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { Physics } from '@react-three/rapier'
 import Table from './Table'
 import Ball from './Ball'
