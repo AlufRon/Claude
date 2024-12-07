@@ -1,9 +1,16 @@
 'use client'
-import { RigidBody } from '@react-three/rapier'
+import { RigidBody, CuboidCollider } from '@react-three/rapier'
 
 export default function Table() {
   return (
-    <RigidBody type="fixed" colliders="hull">
+    <RigidBody type="fixed" colliders={false}>
+      {/* Table colliders */}
+      <CuboidCollider args={[1.37, 0.1, 0.76]} position={[0, -0.1, 0]} restitution={0.8} /> {/* Main surface */}
+      <CuboidCollider args={[0.1, 0.1, 0.76]} position={[1.37, -0.1, 0]} /> {/* Right edge */}
+      <CuboidCollider args={[0.1, 0.1, 0.76]} position={[-1.37, -0.1, 0]} /> {/* Left edge */}
+      <CuboidCollider args={[1.37, 0.1, 0.1]} position={[0, -0.1, 0.76]} /> {/* Back edge */}
+      <CuboidCollider args={[1.37, 0.1, 0.1]} position={[0, -0.1, -0.76]} /> {/* Front edge */}
+
       {/* Main table surface */}
       <mesh receiveShadow castShadow position={[0, 0, 0]}>
         <boxGeometry args={[2.74, 0.05, 1.525]} />
@@ -14,15 +21,15 @@ export default function Table() {
         />
       </mesh>
 
-      {/* Table lines */}
-      <TableLines />
-
-      {/* Net */}
-      <Net />
-
       {/* Table edges */}
       <TableEdges />
-
+      
+      {/* Lines */}
+      <TableLines />
+      
+      {/* Net */}
+      <Net />
+      
       {/* Legs */}
       <TableLegs />
     </RigidBody>
@@ -51,17 +58,10 @@ function TableLines() {
 }
 
 function Net() {
-  // Net posts
-  const postGeometry = [0.03, 0.15, 0.03]
-  const postPositions = [
-    [0, 0.075, 0.7625],
-    [0, 0.075, -0.7625]
-  ]
-
   return (
-    <>
+    <group position={[0, 0.15, 0]}>
       {/* Net mesh */}
-      <mesh position={[0, 0.15, 0]}>
+      <mesh>
         <boxGeometry args={[0.02, 0.15, 1.525]} />
         <meshStandardMaterial
           color="white"
@@ -73,43 +73,38 @@ function Net() {
       </mesh>
 
       {/* Net posts */}
-      {postPositions.map((pos, i) => (
-        <mesh key={i} position={pos} castShadow>
-          <boxGeometry args={postGeometry} />
-          <meshStandardMaterial
-            color="#404040"
-            roughness={0.3}
-            metalness={0.7}
-          />
-        </mesh>
-      ))}
-    </>
+      <mesh position={[0, 0, 0.7625]} castShadow>
+        <boxGeometry args={[0.03, 0.15, 0.03]} />
+        <meshStandardMaterial color="#404040" roughness={0.3} metalness={0.7} />
+      </mesh>
+      <mesh position={[0, 0, -0.7625]} castShadow>
+        <boxGeometry args={[0.03, 0.15, 0.03]} />
+        <meshStandardMaterial color="#404040" roughness={0.3} metalness={0.7} />
+      </mesh>
+    </group>
   )
 }
 
 function TableEdges() {
-  const edgeGeometry = [2.74, 0.05, 0.05]
-  const sideEdgeGeometry = [0.05, 0.05, 1.525]
-  
   return (
     <>
       {/* Long edges */}
       <mesh position={[0, 0, 0.7625]} castShadow>
-        <boxGeometry args={edgeGeometry} />
+        <boxGeometry args={[2.74, 0.05, 0.05]} />
         <meshStandardMaterial color="white" />
       </mesh>
       <mesh position={[0, 0, -0.7625]} castShadow>
-        <boxGeometry args={edgeGeometry} />
+        <boxGeometry args={[2.74, 0.05, 0.05]} />
         <meshStandardMaterial color="white" />
       </mesh>
       
       {/* Short edges */}
       <mesh position={[1.37, 0, 0]} castShadow>
-        <boxGeometry args={sideEdgeGeometry} />
+        <boxGeometry args={[0.05, 0.05, 1.525]} />
         <meshStandardMaterial color="white" />
       </mesh>
       <mesh position={[-1.37, 0, 0]} castShadow>
-        <boxGeometry args={sideEdgeGeometry} />
+        <boxGeometry args={[0.05, 0.05, 1.525]} />
         <meshStandardMaterial color="white" />
       </mesh>
     </>
