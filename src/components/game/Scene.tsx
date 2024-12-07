@@ -1,7 +1,20 @@
 'use client'
 import { Canvas } from '@react-three/fiber'
-import { Environment, OrbitControls, Fog } from '@react-three/drei'
-import { EffectComposer, Bloom, SMAA, HueSaturation } from '@react-three/postprocessing'
+import { 
+  Environment,
+  OrbitControls,
+  Fog,
+  Stars,
+  BakeShadows
+} from '@react-three/drei'
+import { 
+  EffectComposer,
+  Bloom,
+  SMAA,
+  HueSaturation,
+  Vignette,
+  DepthOfField
+} from '@react-three/postprocessing'
 import { Physics } from '@react-three/rapier'
 import { Room } from './Environment'
 import Table from './Table'
@@ -23,13 +36,13 @@ export default function Scene() {
           physicallyCorrectLights: true,
           shadowMap: {
             enabled: true,
-            type: 3 // VSMShadowMap for better shadows
+            type: 3  // VSMShadowMap
           },
         }}
       >
         <color attach="background" args={["#87ceeb"]} />
         
-        {/* High quality environment map */}
+        {/* Environment and atmosphere */}
         <Environment
           preset="sunset"
           ground={{
@@ -38,9 +51,18 @@ export default function Scene() {
             scale: 15
           }}
         />
-
-        {/* Scene fog for depth */}
         <Fog color="#b0c4de" near={1} far={100} />
+        
+        {/* Distant stars for depth */}
+        <Stars
+          radius={100}
+          depth={50}
+          count={5000}
+          factor={4}
+          saturation={0}
+          fade
+          speed={0.5}
+        />
         
         <Room />
         
@@ -55,7 +77,7 @@ export default function Scene() {
           <Paddle position={[1, 0.3, 0]} color="#4040ff" playerId={2} />
         </Physics>
 
-        {/* Post processing effects */}
+        {/* Enhanced post processing */}
         <EffectComposer multisampling={0}>
           <SMAA />
           <Bloom
@@ -63,11 +85,25 @@ export default function Scene() {
             luminanceThreshold={0.8}
             luminanceSmoothing={0.9}
           />
+          <DepthOfField
+            focusDistance={0}
+            focalLength={0.02}
+            bokehScale={2}
+            height={480}
+          />
           <HueSaturation
-            hue={0} // slightly adjust color
-            saturation={0.15} // increase saturation
+            hue={0}
+            saturation={0.15}
+          />
+          <Vignette
+            offset={0.5}
+            darkness={0.5}
+            opacity={0.3}
           />
         </EffectComposer>
+
+        {/* Bake shadows for performance */}
+        <BakeShadows />
 
         <OrbitControls
           enablePan={false}
