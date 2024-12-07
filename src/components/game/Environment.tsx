@@ -1,89 +1,99 @@
 'use client'
 import { useRef } from 'react'
 
-const FLOOR_COLOR = '#2A2A2A'
-const WALL_COLOR = '#3A3A3A'
-
-export function Room() {
+function Tree({ position, scale = 1 }) {
   return (
-    <group>
-      {/* Floor */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
-        <planeGeometry args={[20, 20]} />
-        <meshStandardMaterial 
-          color={FLOOR_COLOR}
-          roughness={0.8}
-          metalness={0.2}
-        />
+    <group position={position} scale={scale}>
+      {/* Trunk */}
+      <mesh castShadow position={[0, 1, 0]}>
+        <cylinderGeometry args={[0.2, 0.3, 2]} />
+        <meshStandardMaterial color="#3e2723" roughness={0.8} />
       </mesh>
-
-      {/* Walls */}
-      <mesh receiveShadow position={[0, 3, -10]}>
-        <boxGeometry args={[20, 10, 0.2]} />
-        <meshStandardMaterial 
-          color={WALL_COLOR}
-          roughness={0.7}
-          metalness={0.3}
-        />
+      {/* Leaves layers */}
+      <mesh castShadow position={[0, 2.5, 0]}>
+        <coneGeometry args={[1.5, 3, 8]} />
+        <meshStandardMaterial color="#2e7d32" roughness={0.8} />
       </mesh>
-      
-      <mesh receiveShadow position={[-10, 3, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <boxGeometry args={[20, 10, 0.2]} />
-        <meshStandardMaterial 
-          color={WALL_COLOR}
-          roughness={0.7}
-          metalness={0.3}
-        />
+      <mesh castShadow position={[0, 3.5, 0]}>
+        <coneGeometry args={[1, 2, 8]} />
+        <meshStandardMaterial color="#388e3c" roughness={0.8} />
       </mesh>
-      
-      <mesh receiveShadow position={[10, 3, 0]} rotation={[0, -Math.PI / 2, 0]}>
-        <boxGeometry args={[20, 10, 0.2]} />
-        <meshStandardMaterial 
-          color={WALL_COLOR}
-          roughness={0.7}
-          metalness={0.3}
-        />
-      </mesh>
-
-      {/* Ceiling */}
-      <mesh receiveShadow position={[0, 8, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[20, 20]} />
-        <meshStandardMaterial 
-          color={FLOOR_COLOR}
-          roughness={0.8}
-          metalness={0.2}
-        />
-      </mesh>
-
-      {/* Spotlights */}
-      <SpotLight position={[-2, 7, 0]} />
-      <SpotLight position={[2, 7, 0]} />
     </group>
   )
 }
 
-function SpotLight({ position }: { position: [number, number, number] }) {
-  const lightRef = useRef()
-
+function Sun() {
   return (
-    <group position={position}>
-      {/* Light fixture */}
-      <mesh castShadow>
-        <cylinderGeometry args={[0.2, 0.3, 0.3, 32]} />
-        <meshStandardMaterial color="#444" />
+    <group position={[50, 40, -60]}>
+      {/* Sun disk */}
+      <mesh>
+        <sphereGeometry args={[10]} />
+        <meshStandardMaterial
+          color="#fdd835"
+          emissive="#fdd835"
+          emissiveIntensity={2}
+          toneMapped={false}
+        />
       </mesh>
-      
-      {/* Actual light */}
-      <spotLight
-        ref={lightRef}
-        intensity={1}
-        angle={0.5}
-        penumbra={0.5}
+      {/* Sun light */}
+      <directionalLight
+        intensity={3}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        position={[0, 0, 0]}
-        target-position={[0, -1, 0]}
+        shadow-camera-left={-20}
+        shadow-camera-right={20}
+        shadow-camera-top={20}
+        shadow-camera-bottom={-20}
       />
+    </group>
+  )
+}
+
+function Grass() {
+  // Create a grid of grass patches
+  const grassPatches = []
+  for (let x = -15; x <= 15; x += 2) {
+    for (let z = -15; z <= 15; z += 2) {
+      grassPatches.push(
+        <mesh 
+          key={`${x}-${z}`} 
+          position={[x + Math.random(), -1.99, z + Math.random()]}
+          rotation={[0, Math.random() * Math.PI, 0]}
+        >
+          <boxGeometry args={[0.2, 0.1, 0.2]} />
+          <meshStandardMaterial color={`hsl(${120 + Math.random() * 20}, 70%, ${30 + Math.random() * 20}%)`} />
+        </mesh>
+      )
+    }
+  }
+  return <group>{grassPatches}</group>
+}
+
+export function Room() {
+  return (
+    <group>
+      {/* Ground with grass */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
+        <planeGeometry args={[100, 100]} />
+        <meshStandardMaterial color="#4caf50" roughness={0.8} />
+      </mesh>
+      <Grass />
+
+      {/* Trees */}
+      <Tree position={[-8, 0, -8]} scale={2} />
+      <Tree position={[10, 0, -12]} scale={1.7} />
+      <Tree position={[-12, 0, -15]} scale={2.2} />
+      <Tree position={[15, 0, -10]} scale={1.8} />
+      <Tree position={[-6, 0, -20]} scale={2.5} />
+
+      {/* Sun */}
+      <Sun />
+
+      {/* Fog for depth */}
+      <fog attach="fog" args={["#90caf9", 30, 100]} />
+
+      {/* Ambient light for overall illumination */}
+      <ambientLight intensity={0.5} />
     </group>
   )
 }
