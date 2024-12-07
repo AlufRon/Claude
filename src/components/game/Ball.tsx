@@ -5,10 +5,10 @@ import { RigidBody, vec3, BallCollider } from '@react-three/rapier'
 import { useGameStore } from '@/store/gameStore'
 
 const BALL_RADIUS = 0.02
-const INITIAL_SPEED_X = 2.0  // Increased horizontal speed
-const BOUNCE_VELOCITY_Y = 1.2  // Increased bounce height
+const INITIAL_SPEED_X = 2.0  // Horizontal speed
+const BOUNCE_VELOCITY_Y = 2.0  // Much higher bounce
 const TABLE_HEIGHT = 0.0
-const TABLE_WIDTH = 1.35  // Adjusted to table edge
+const TABLE_WIDTH = 1.35  // Table edge position
 const TABLE_DEPTH = 0.6
 
 export default function Ball() {
@@ -23,28 +23,34 @@ export default function Ball() {
     const pos = ballRef.current.translation()
     const vel = ballRef.current.linvel()
 
-    // Only bounce when hitting table and far enough from last bounce
-    if (pos.y < TABLE_HEIGHT + BALL_RADIUS && vel.y < 0 && 
-        Math.abs(pos.x - lastBounceX.current) > 1.0) {
-      lastBounceX.current = pos.x
+    // Change direction at table edges
+    if (Math.abs(pos.x) > TABLE_WIDTH - 0.1) {  // Slightly before edge
+      directionRef.current *= -1  // Reverse direction
+      const newDirection = directionRef.current
       
-      // Keep horizontal direction until reaching table edge
-      const currentDirection = directionRef.current
-      
+      // Apply bounce velocity
       ballRef.current.setLinvel(vec3({
-        x: INITIAL_SPEED_X * currentDirection,
+        x: INITIAL_SPEED_X * newDirection,
+        y: BOUNCE_VELOCITY_Y,  // High upward velocity
+        z: 0
+      }))
+    }
+
+    // Bounce when hitting table
+    if (pos.y < TABLE_HEIGHT + BALL_RADIUS && vel.y < 0) {
+      ballRef.current.setLinvel(vec3({
+        x: vel.x,  // Maintain current horizontal velocity
         y: BOUNCE_VELOCITY_Y,
         z: 0
       }))
     }
 
-    // Change direction only at table edges
-    if (Math.abs(pos.x) > TABLE_WIDTH && Math.sign(pos.x) === directionRef.current) {
-      directionRef.current *= -1
+    // Reset if ball goes too high or too low
+    if (pos.y < -1 || pos.y > 5) {  // Increased height limit
       resetBall()
     }
 
-    // Ensure the ball stays within table boundaries (Z-axis)
+    // Keep ball on table depth-wise
     if (Math.abs(pos.z) > TABLE_DEPTH) {
       ballRef.current.setTranslation(vec3({
         x: pos.x,
@@ -54,26 +60,21 @@ export default function Ball() {
       ballRef.current.setLinvel(vec3({
         x: vel.x,
         y: vel.y,
-        z: -vel.z * 0.5
+        z: 0  // Stop z movement
       }))
-    }
-
-    // Reset if ball goes too high or too low
-    if (pos.y < -0.5 || pos.y > 2) {
-      resetBall()
     }
   })
 
   const resetBall = () => {
     if (!ballRef.current) return
     
-    const startX = -1.2  // Always start from the same side
-    ballRef.current.setTranslation(vec3({ x: startX, y: 0.3, z: 0 }))
-    directionRef.current = 1  // Reset direction
+    const startX = -1.2
+    ballRef.current.setTranslation(vec3({ x: startX, y: 0.5, z: 0 }))
+    directionRef.current = 1
     
     ballRef.current.setLinvel(vec3({
       x: INITIAL_SPEED_X,
-      y: 0.2,
+      y: 0.5,  // Start with upward velocity
       z: 0
     }))
   }
@@ -88,14 +89,14 @@ export default function Ball() {
     <RigidBody
       ref={ballRef}
       colliders={false}
-      position={[-1.2, 0.3, 0]}
+      position={[-1.2, 0.5, 0]}
       restitution={0.95}
-      friction={0.15}
+      friction={0.1}
       linearDamping={0}
       angularDamping={0}
-      gravityScale={1.0}
+      gravityScale={0.8}  // Reduced gravity for higher bounces
     >
-      <BallCollider args={[BALL_RADIUS]} restitution={0.95} friction={0.15} />
+      <BallCollider args={[BALL_RADIUS]} restitution={0.95} friction={0.1} />
       <mesh castShadow>
         <sphereGeometry args={[BALL_RADIUS, 32, 32]} />
         <meshStandardMaterial
