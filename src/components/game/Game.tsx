@@ -27,11 +27,15 @@ export default function Game() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">
-      <Suspense fallback={<LoadingScreen />}>
-        <Scene />
-      </Suspense>
-      <GameUI />
-      <BallControls />
+      <div className="absolute inset-0 z-0">
+        <Suspense fallback={<LoadingScreen />}>
+          <Scene />
+        </Suspense>
+      </div>
+      <div className="relative z-10">
+        <GameUI />
+        <BallControls />
+      </div>
     </div>
   )
 }
