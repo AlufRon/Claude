@@ -1,8 +1,16 @@
 'use client'
 import { useRef, useState, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { RigidBody, vec3 } from '@react-three/rapier'
+import { RigidBody, vec3, BallCollider } from '@react-three/rapier'
 import { useGameStore } from '@/store/gameStore'
+
+const BALL_RADIUS = 0.02
+const MIN_HEIGHT = -0.5
+const MAX_HEIGHT = 2
+const TABLE_BOUNDS = {
+  x: 1.5,
+  z: 0.8
+}
 
 export default function Ball() {
   const ballRef = useRef()
@@ -25,8 +33,13 @@ export default function Ball() {
 
     // Apply initial impulse
     if (!initialImpulseApplied) {
-      const initialSpeed = 0.3
+      const initialSpeed = 0.25
       const direction = Math.random() > 0.5 ? 1 : -1
+      ballRef.current.setTranslation({
+        x: 0,
+        y: 0.3,
+        z: 0
+      })
       ballRef.current.applyImpulse(vec3({ 
         x: direction * initialSpeed, 
         y: 0.1, 
@@ -35,11 +48,12 @@ export default function Ball() {
       setInitialImpulseApplied(true)
       lastHitTime.current = performance.now()
       consecutiveHits.current = 0
+      return
     }
 
     // Speed control
     const currentSpeed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z)
-    const maxSpeed = 0.8
+    const maxSpeed = 0.6
     const minSpeed = 0.2
 
     if (currentSpeed > maxSpeed) {
@@ -71,14 +85,16 @@ export default function Ball() {
       }))
     }
 
-    // Scoring and reset conditions
-    if (Math.abs(pos.x) > 1.5) {
-      incrementScore(pos.x > 0 ? 1 : 2)
-      resetBall()
-    }
-
-    // Reset if ball goes too high/low or too far forward/back
-    if (pos.y < -0.5 || pos.y > 2 || Math.abs(pos.z) > 1) {
+    // Check bounds and reset conditions
+    if (
+      pos.y < MIN_HEIGHT || 
+      pos.y > MAX_HEIGHT || 
+      Math.abs(pos.z) > TABLE_BOUNDS.z || 
+      Math.abs(pos.x) > TABLE_BOUNDS.x
+    ) {
+      if (Math.abs(pos.x) > TABLE_BOUNDS.x) {
+        incrementScore(pos.x > 0 ? 1 : 2)
+      }
       resetBall()
     }
   })
@@ -96,12 +112,12 @@ export default function Ball() {
   return (
     <RigidBody
       ref={ballRef}
-      colliders="ball"
+      colliders={false}
+      position={[0, 0.3, 0]}
       restitution={0.9}
       friction={0.2}
       linearDamping={0.1}
       angularDamping={0.2}
-      position={[0, 0.3, 0]}
       onCollisionEnter={() => {
         if (ballRef.current) {
           lastHitTime.current = performance.now()
@@ -120,8 +136,9 @@ export default function Ball() {
         }
       }}
     >
+      <BallCollider args={[BALL_RADIUS]} restitution={0.9} friction={0.2} />
       <mesh castShadow>
-        <sphereGeometry args={[0.02]} />
+        <sphereGeometry args={[BALL_RADIUS, 32, 32]} />
         <meshStandardMaterial 
           color="white"
           emissive="white"
