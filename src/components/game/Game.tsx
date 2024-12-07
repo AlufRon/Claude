@@ -26,15 +26,15 @@ export default function Game() {
   useKeyboardControls()
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden">
-      <div className="absolute inset-0 z-0">
-        <Suspense fallback={<LoadingScreen />}>
-          <Scene />
-        </Suspense>
-      </div>
-      <div className="relative z-10">
-        <GameUI />
-        <BallControls />
+    <div className="relative w-screen h-screen">
+      <Suspense fallback={<LoadingScreen />}>
+        <Scene />
+      </Suspense>
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="pointer-events-auto">
+          <GameUI />
+          <BallControls />
+        </div>
       </div>
     </div>
   )
