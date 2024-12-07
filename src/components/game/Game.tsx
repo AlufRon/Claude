@@ -5,7 +5,6 @@ import { GameUI } from '../ui/GameUI'
 import { BallControls } from '../ui/BallControls'
 import { useKeyboardControls } from '../controls/useKeyboardControls'
 
-// Dynamic import with proper type annotation
 const Scene = dynamic(
   () => import('./Scene').then(mod => mod.default),
   { 
@@ -27,12 +26,12 @@ export default function Game() {
   useKeyboardControls()
 
   return (
-    <div className="fixed inset-0 w-screen h-screen overflow-hidden">
+    <div className="relative w-screen h-screen overflow-hidden">
       <Suspense fallback={<LoadingScreen />}>
         <Scene />
-        <GameUI />
-        <BallControls />
       </Suspense>
+      <GameUI />
+      <BallControls />
     </div>
   )
 }
