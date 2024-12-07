@@ -5,10 +5,14 @@ import { GameUI } from '../ui/GameUI'
 import { BallControls } from '../ui/BallControls'
 import { useKeyboardControls } from '../controls/useKeyboardControls'
 
-const Scene = dynamic(() => import('./Scene'), {
-  ssr: false,
-  loading: () => <LoadingScreen />
-})
+// Dynamic import with proper type annotation
+const Scene = dynamic(
+  () => import('./Scene').then(mod => mod.default),
+  { 
+    ssr: false,
+    loading: () => <LoadingScreen />
+  }
+)
 
 function LoadingScreen() {
   return (
