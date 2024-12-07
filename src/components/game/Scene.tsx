@@ -9,7 +9,7 @@ import Paddle from './Paddle'
 
 export default function Scene() {
   return (
-    <Canvas shadows camera={{ position: [4, 4, 4], fov: 50 }}>
+    <Canvas shadows camera={{ position: [0, 5, 5], fov: 60 }}>
       <Environment preset="sunset" />
       <ambientLight intensity={0.5} />
       <directionalLight
