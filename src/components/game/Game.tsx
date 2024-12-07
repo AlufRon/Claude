@@ -6,26 +6,23 @@ import { useKeyboardControls } from '../controls/useKeyboardControls'
 
 const Scene = dynamic(() => import('./Scene'), {
   ssr: false,
-  loading: () => (
-    <LoadingScreen />
-  )
+  loading: () => <LoadingScreen />
 })
 
 function LoadingScreen() {
   return (
-    <div className="w-full h-screen bg-black flex flex-col items-center justify-center gap-4">
+    <div className="absolute inset-0 w-full h-full bg-black flex flex-col items-center justify-center gap-4">
       <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      <div className="text-white text-2xl">Loading Game...</div>
+      <div className="text-white text-2xl font-semibold">Loading Game...</div>
     </div>
   )
 }
 
 export default function Game() {
-  // Initialize keyboard controls
   useKeyboardControls()
 
   return (
-    <div className="fixed inset-0 w-full h-full bg-black">
+    <div className="absolute inset-0 w-full h-full overflow-hidden">
       <Suspense fallback={<LoadingScreen />}>
         <Scene />
         <GameUI />
