@@ -1,7 +1,7 @@
 'use client'
 import { Canvas } from '@react-three/fiber'
 import { 
-  Environment,
+  Environment as DreiEnvironment,
   OrbitControls,
   Fog,
   Stars,
@@ -16,7 +16,7 @@ import {
   DepthOfField
 } from '@react-three/postprocessing'
 import { Physics } from '@react-three/rapier'
-import { Room } from './Environment'
+import { Environment } from './Environment'  // Updated import
 import Table from './Table'
 import Ball from './Ball'
 import Paddle from './Paddle'
@@ -36,14 +36,14 @@ export default function Scene() {
           physicallyCorrectLights: true,
           shadowMap: {
             enabled: true,
-            type: 3  // VSMShadowMap
+            type: 3
           },
         }}
       >
         <color attach="background" args={["#87ceeb"]} />
         
-        {/* Environment and atmosphere */}
-        <Environment
+        {/* Environment map */}
+        <DreiEnvironment
           preset="sunset"
           ground={{
             height: 15,
@@ -53,7 +53,6 @@ export default function Scene() {
         />
         <Fog color="#b0c4de" near={1} far={100} />
         
-        {/* Distant stars for depth */}
         <Stars
           radius={100}
           depth={50}
@@ -64,7 +63,7 @@ export default function Scene() {
           speed={0.5}
         />
         
-        <Room />
+        <Environment />
         
         <Physics
           debug={false}
@@ -77,7 +76,6 @@ export default function Scene() {
           <Paddle position={[1, 0.3, 0]} color="#4040ff" playerId={2} />
         </Physics>
 
-        {/* Enhanced post processing */}
         <EffectComposer multisampling={0}>
           <SMAA />
           <Bloom
@@ -102,7 +100,6 @@ export default function Scene() {
           />
         </EffectComposer>
 
-        {/* Bake shadows for performance */}
         <BakeShadows />
 
         <OrbitControls
