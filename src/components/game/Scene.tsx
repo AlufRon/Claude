@@ -1,17 +1,20 @@
 'use client'
 import { Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { 
-  Environment, 
-  OrbitControls, 
-  PerspectiveCamera, 
+import {
+  Environment,
+  OrbitControls,
+  PerspectiveCamera,
   Stars,
-  KeyboardControls
+  Grid,
+  AccumulativeShadows,
+  RandomizedLight,
+  SoftShadows
 } from '@react-three/drei'
-import { 
-  EffectComposer, 
-  Bloom, 
-  ChromaticAberration, 
+import {
+  EffectComposer,
+  Bloom,
+  ChromaticAberration,
   DepthOfField,
   Vignette
 } from '@react-three/postprocessing'
@@ -27,33 +30,74 @@ export default function Scene() {
   const { isPlaying, isPaused } = useGameStore()
 
   return (
-    <Canvas shadows>
-      <PerspectiveCamera
-        makeDefault
-        position={[4, 4, 4]}
-        fov={60}
-        near={0.1}
-        far={100}
-      />
+    <Canvas 
+      shadows 
+      camera={{ position: [4, 4, 4], fov: 60 }}
+      style={{ height: '100%', width: '100%' }}
+      gl={{ 
+        antialias: true,
+        alpha: false,
+        stencil: false,
+        powerPreference: 'high-performance'
+      }}
+    >
+      <SoftShadows size={40} samples={16} />
       
       <color attach="background" args={["#000000"]} />
       <fogExp2 attach="fog" color="#000000" density={0.02} />
       
       <Suspense fallback={null}>
-        <Stars 
-          radius={50}
+        <Stars
+          radius={100}
           depth={50}
-          count={1000}
+          count={5000}
           factor={4}
           saturation={0}
           fade
           speed={1}
         />
-        
-        <Environment preset="night" />
+
+        <Environment
+          preset="night"
+          background
+          blur={0.8}
+        />
+
+        <AccumulativeShadows
+          temporal
+          frames={100}
+          alphaTest={0.85}
+          opacity={0.8}
+          scale={20}
+          position={[0, -0.5, 0]}
+        >
+          <RandomizedLight
+            amount={8}
+            radius={10}
+            ambient={0.5}
+            intensity={1}
+            position={[5, 5, -10]}
+            bias={0.001}
+          />
+        </AccumulativeShadows>
+
+        <Grid
+          renderOrder={-1}
+          position={[0, -1, 0]}
+          infiniteGrid
+          cellSize={0.6}
+          cellThickness={0.6}
+          sectionSize={3.3}
+          sectionThickness={1}
+          sectionColor={[0.5, 0.5, 1]}
+          fadeDistance={30}
+          fadeStrength={1}
+          followCamera={false}
+        />
+
         <RoomLights />
-        
-        <Physics 
+
+        <Physics
           debug={false}
           gravity={[0, -9.81, 0]}
           paused={!isPlaying || isPaused}
@@ -65,12 +109,13 @@ export default function Scene() {
           <Paddle position={[-1, 0.1, 0]} color="#ff4040" playerId={1} />
           <Paddle position={[1, 0.1, 0]} color="#4040ff" playerId={2} />
         </Physics>
-        
-        <EffectComposer>
-          <Bloom 
+
+        <EffectComposer multisampling={4}>
+          <Bloom
             intensity={1.5}
             luminanceThreshold={0.6}
             luminanceSmoothing={0.9}
+            mipmapBlur
           />
           <ChromaticAberration
             blendFunction={BlendFunction.NORMAL}
@@ -83,12 +128,13 @@ export default function Scene() {
             height={480}
           />
           <Vignette
+            offset={0.5}
+            darkness={0.5}
             opacity={0.3}
-            darkness={0.8}
           />
         </EffectComposer>
-        
-        <OrbitControls 
+
+        <OrbitControls
           enablePan={false}
           minDistance={3}
           maxDistance={10}
