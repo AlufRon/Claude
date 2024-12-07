@@ -1,54 +1,109 @@
 'use client'
 import { useRef } from 'react'
+import * as THREE from 'three'
 
-function Tree({ position, scale = 1 }) {
+// Ground textures and colors
+const GRASS_COLORS = [
+  '#2d5a27',  // Dark green
+  '#3f8f36',  // Medium green
+  '#4caf50',  // Light green
+  '#388e3c',  // Forest green
+  '#1b5e20'   // Deep green
+]
+
+function DetailedTree({ position, scale = 1 }) {
+  const trunkColor = new THREE.Color('#3e2723').multiplyScalar(0.8 + Math.random() * 0.4)
+  const leavesColor = new THREE.Color('#2e7d32').multiplyScalar(0.8 + Math.random() * 0.4)
+  const rotation = [0, Math.random() * Math.PI * 2, 0]
+
   return (
-    <group position={position} scale={scale}>
-      {/* Trunk */}
-      <mesh castShadow receiveShadow position={[0, 1, 0]}>
-        <cylinderGeometry args={[0.2, 0.3, 2]} />
-        <meshStandardMaterial color="#3e2723" roughness={0.8} />
+    <group position={position} scale={scale} rotation={rotation}>
+      {/* Main trunk */}
+      <mesh castShadow receiveShadow position={[0, 1.5, 0]}>
+        <cylinderGeometry args={[0.2, 0.3, 3]} />
+        <meshStandardMaterial 
+          color={trunkColor}
+          roughness={0.9}
+          metalness={0}
+          bumpScale={0.5}
+        />
       </mesh>
-      {/* Leaves layers */}
-      <mesh castShadow receiveShadow position={[0, 2.5, 0]}>
-        <coneGeometry args={[1.5, 3, 8]} />
-        <meshStandardMaterial color="#2e7d32" roughness={0.8} />
-      </mesh>
-      <mesh castShadow receiveShadow position={[0, 3.5, 0]}>
-        <coneGeometry args={[1, 2, 8]} />
-        <meshStandardMaterial color="#388e3c" roughness={0.8} />
-      </mesh>
+      
+      {/* Branches */}
+      {[...Array(5)].map((_, i) => {
+        const angle = (i / 5) * Math.PI * 2
+        const branchPos = [
+          Math.cos(angle) * 0.3,
+          2 + Math.random(),
+          Math.sin(angle) * 0.3
+        ]
+        return (
+          <mesh key={i} castShadow position={branchPos} rotation={[Math.random() * 0.5, angle, Math.PI * 0.2]}>
+            <cylinderGeometry args={[0.05, 0.08, 1]} />
+            <meshStandardMaterial color={trunkColor} roughness={0.9} />
+          </mesh>
+        )
+      })}
+
+      {/* Leaf clusters */}
+      {[...Array(3)].map((_, i) => (
+        <group key={i} position={[0, 2.5 + i, 0]}>
+          <mesh castShadow receiveShadow>
+            <sphereGeometry args={[1.2 - i * 0.2, 8, 8]} />
+            <meshStandardMaterial 
+              color={leavesColor}
+              roughness={0.8}
+              metalness={0.1}
+              transparent
+              opacity={0.95}
+            />
+          </mesh>
+        </group>
+      ))}
     </group>
   )
 }
 
-function StaticGrassPatch({ position, rotation, scale }) {
+function TerrainPatch({ position, rotation, scale }) {
+  const color = GRASS_COLORS[Math.floor(Math.random() * GRASS_COLORS.length)]
+  const heightScale = 0.1 + Math.random() * 0.2
+
   return (
     <mesh 
       position={position}
       rotation={rotation}
-      scale={scale}
+      scale={[scale[0], heightScale, scale[2]]}
       receiveShadow
     >
-      <boxGeometry args={[1, 0.2, 1]} />
+      <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial 
-        color="#3f8f36"
-        roughness={0.8}
-        metalness={0.1}
+        color={color}
+        roughness={0.8 + Math.random() * 0.2}
+        metalness={0}
       />
     </mesh>
   )
 }
 
 function Ground() {
+  // Create terrain patches with slight elevation changes
   const patches = []
   for (let x = -30; x <= 30; x += 2) {
     for (let z = -30; z <= 30; z += 2) {
-      const position = [x + Math.random() * 0.5, -2, z + Math.random() * 0.5]
-      const rotation = [0, Math.random() * Math.PI * 0.1, 0]
-      const scale = [1 + Math.random() * 0.2, 1, 1 + Math.random() * 0.2]
+      // Skip area around ping pong table
+      if (Math.abs(x) < 4 && Math.abs(z) < 3) continue
+
+      const heightOffset = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 0.5
+      const position = [x, -2 + heightOffset, z]
+      const rotation = [
+        Math.random() * 0.1,
+        Math.random() * Math.PI * 0.1,
+        Math.random() * 0.1
+      ]
+      const scale = [2 + Math.random() * 0.5, 1, 2 + Math.random() * 0.5]
+      
       patches.push(
-        <StaticGrassPatch
+        <TerrainPatch
           key={`${x}-${z}`}
           position={position}
           rotation={rotation}
@@ -57,55 +112,77 @@ function Ground() {
       )
     }
   }
+
   return (
     <group>
       {/* Base ground */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
-        <planeGeometry args={[100, 100]} />
-        <meshStandardMaterial color="#2d5a27" roughness={1} metalness={0} />
+        <planeGeometry args={[100, 100, 50, 50]} />
+        <meshStandardMaterial 
+          color={GRASS_COLORS[0]}
+          roughness={1}
+          metalness={0}
+          wireframe={false}
+        />
       </mesh>
-      {/* Grass patches */}
+      {/* Terrain patches */}
       {patches}
     </group>
   )
 }
 
 export function Room() {
+  const sunRef = useRef()
+  const sunPosition = [30, 50, 30]
+
   return (
     <group>
-      {/* Main directional light (sun) */}
+      {/* Main sun light */}
       <directionalLight
+        ref={sunRef}
         castShadow
-        position={[15, 20, 15]}
-        intensity={1.5}
+        position={sunPosition}
+        intensity={2}
         shadow-mapSize={[4096, 4096]}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
+        shadow-camera-left={-50}
+        shadow-camera-right={50}
+        shadow-camera-top={50}
+        shadow-camera-bottom={-50}
         shadow-camera-near={1}
         shadow-camera-far={100}
+        color="#ffd700"
       />
       
-      {/* Ambient light for overall illumination */}
-      <ambientLight intensity={0.3} />
+      {/* Ambient light */}
+      <ambientLight intensity={0.3} color="#b0c4de" />
       
-      {/* Hemisphere light for natural sky lighting */}
+      {/* Hemisphere light */}
       <hemisphereLight
-        args={["#85b5e1", "#71a861", 1]}
+        args={["#87ceeb", "#3f8f36", 1]}
         position={[0, 50, 0]}
         intensity={0.5}
       />
 
-      {/* Ground and grass */}
+      {/* Ground with terrain */}
       <Ground />
 
-      {/* Trees */}
-      <Tree position={[-8, 0, -8]} scale={2} />
-      <Tree position={[10, 0, -12]} scale={1.7} />
-      <Tree position={[-12, 0, -15]} scale={2.2} />
-      <Tree position={[15, 0, -10]} scale={1.8} />
-      <Tree position={[-6, 0, -20]} scale={2.5} />
+      {/* Detailed trees scattered around */}
+      {[...Array(15)].map((_, i) => {
+        const angle = (i / 15) * Math.PI * 2
+        const radius = 15 + Math.random() * 10
+        const position = [
+          Math.cos(angle) * radius,
+          0,
+          Math.sin(angle) * radius
+        ]
+        return (
+          <DetailedTree 
+            key={i}
+            position={position}
+            scale={1.5 + Math.random()}
+          />
+        )
+      })}
     </group>
   )
 }
