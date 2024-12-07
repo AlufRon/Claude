@@ -52,8 +52,8 @@ export default function Scene() {
           <Walls />
           <Table />
           <Ball />
-          <Paddle position={[-1, 0.1, 0]} color="#ff4040" playerId={1} />
-          <Paddle position={[1, 0.1, 0]} color="#4040ff" playerId={2} />
+          <Paddle position={[-1, 0.3, 0]} color="#ff4040" playerId={1} />
+          <Paddle position={[1, 0.3, 0]} color="#4040ff" playerId={2} />
         </Physics>
 
         <EffectComposer disableNormalPass>
