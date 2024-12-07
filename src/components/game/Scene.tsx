@@ -11,7 +11,7 @@ export default function Scene() {
   const { isPlaying, isPaused } = useGameStore()
 
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
+    <div className="absolute inset-0" style={{ zIndex: 0 }}>
       <Canvas
         shadows
         camera={{ position: [8, 8, 8], fov: 50 }}
