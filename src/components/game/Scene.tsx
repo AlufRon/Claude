@@ -1,7 +1,6 @@
 'use client'
 import { Canvas } from '@react-three/fiber'
-import { Environment, OrbitControls, Stars } from '@react-three/drei'
-import { EffectComposer, Bloom, SMAA } from '@react-three/postprocessing'
+import { Environment, OrbitControls } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { Room } from './Environment'
 import Table from './Table'
@@ -16,16 +15,21 @@ export default function Scene() {
     <div style={{ width: '100vw', height: '100vh' }}>
       <Canvas
         shadows
-        camera={{ position: [4, 4, 4], fov: 50 }}
+        camera={{ position: [8, 8, 8], fov: 50 }}
         gl={{
-          antialias: false,
-          powerPreference: 'high-performance',
+          antialias: true,
+          alpha: false,
+          physicallyCorrectLights: true,
+          shadowMap: {
+            enabled: true,
+            type: 3 // VSMShadowMap
+          }
         }}
       >
-        <color attach="background" args={["#87ceeb"]} /> {/* Sky blue background */}
+        <color attach="background" args={["#87ceeb"]} /> {/* Sky blue */}
         
-        {/* Environment for better lighting */}
-        <Environment preset="sunset" background blur={0.6} />
+        {/* Environment map for reflections */}
+        <Environment preset="sunset" ground={{ height: 5, radius: 40 }} />
         
         <Room />
         
@@ -40,18 +44,9 @@ export default function Scene() {
           <Paddle position={[1, 0.3, 0]} color="#4040ff" playerId={2} />
         </Physics>
 
-        <EffectComposer multisampling={0}>
-          <SMAA />
-          <Bloom
-            intensity={0.5}
-            luminanceThreshold={0.9}
-            luminanceSmoothing={0.9}
-          />
-        </EffectComposer>
-
         <OrbitControls
           enablePan={false}
-          minDistance={3}
+          minDistance={5}
           maxDistance={20}
           minPolarAngle={Math.PI / 6}
           maxPolarAngle={Math.PI / 2.5}
