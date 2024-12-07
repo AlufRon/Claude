@@ -2,6 +2,7 @@
 import { Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { GameUI } from '../ui/GameUI'
+import { BallControls } from '../ui/BallControls'
 import { useKeyboardControls } from '../controls/useKeyboardControls'
 
 const Scene = dynamic(() => import('./Scene'), {
@@ -26,6 +27,7 @@ export default function Game() {
       <Suspense fallback={<LoadingScreen />}>
         <Scene />
         <GameUI />
+        <BallControls />
       </Suspense>
     </div>
   )
