@@ -6,17 +6,18 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'PingPong Tournament',
-  description: 'Interactive ping pong tournament platform',
+  description: '3D PingPong Game',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="en">
       <body className={inter.className}>
-        <a href="#main" className="sr-only focus:not-sr-only">
-          Skip to main content
-        </a>
-        <main id="main">{children}</main>
+        {children}
       </body>
     </html>
   )
