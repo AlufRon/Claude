@@ -1,65 +1,89 @@
 'use client'
 import { useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
 
-export function Ground() {
+const FLOOR_COLOR = '#2A2A2A'
+const WALL_COLOR = '#3A3A3A'
+
+export function Room() {
   return (
-    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
-      <planeGeometry args={[50, 50]} />
-      <meshStandardMaterial 
-        color="#303030"
-        roughness={0.8}
-        metalness={0.2}
-      />
-    </mesh>
+    <group>
+      {/* Floor */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
+        <planeGeometry args={[20, 20]} />
+        <meshStandardMaterial 
+          color={FLOOR_COLOR}
+          roughness={0.8}
+          metalness={0.2}
+        />
+      </mesh>
+
+      {/* Walls */}
+      <mesh receiveShadow position={[0, 3, -10]}>
+        <boxGeometry args={[20, 10, 0.2]} />
+        <meshStandardMaterial 
+          color={WALL_COLOR}
+          roughness={0.7}
+          metalness={0.3}
+        />
+      </mesh>
+      
+      <mesh receiveShadow position={[-10, 3, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <boxGeometry args={[20, 10, 0.2]} />
+        <meshStandardMaterial 
+          color={WALL_COLOR}
+          roughness={0.7}
+          metalness={0.3}
+        />
+      </mesh>
+      
+      <mesh receiveShadow position={[10, 3, 0]} rotation={[0, -Math.PI / 2, 0]}>
+        <boxGeometry args={[20, 10, 0.2]} />
+        <meshStandardMaterial 
+          color={WALL_COLOR}
+          roughness={0.7}
+          metalness={0.3}
+        />
+      </mesh>
+
+      {/* Ceiling */}
+      <mesh receiveShadow position={[0, 8, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[20, 20]} />
+        <meshStandardMaterial 
+          color={FLOOR_COLOR}
+          roughness={0.8}
+          metalness={0.2}
+        />
+      </mesh>
+
+      {/* Spotlights */}
+      <SpotLight position={[-2, 7, 0]} />
+      <SpotLight position={[2, 7, 0]} />
+    </group>
   )
 }
 
-export function RoomLights() {
+function SpotLight({ position }: { position: [number, number, number] }) {
   const lightRef = useRef()
-  
-  useFrame(({clock}) => {
-    if (lightRef.current) {
-      lightRef.current.position.x = Math.sin(clock.getElapsedTime() * 0.5) * 8
-      lightRef.current.position.z = Math.cos(clock.getElapsedTime() * 0.5) * 8
-    }
-  })
 
   return (
-    <>
-      <ambientLight intensity={0.2} />
-      <directionalLight
+    <group position={position}>
+      {/* Light fixture */}
+      <mesh castShadow>
+        <cylinderGeometry args={[0.2, 0.3, 0.3, 32]} />
+        <meshStandardMaterial color="#444" />
+      </mesh>
+      
+      {/* Actual light */}
+      <spotLight
         ref={lightRef}
-        position={[5, 5, 5]}
         intensity={1}
+        angle={0.5}
+        penumbra={0.5}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize={[2048, 2048]}
+        position={[0, 0, 0]}
+        target-position={[0, -1, 0]}
       />
-      <pointLight position={[-5, 5, -5]} intensity={0.5} />
-      <pointLight position={[5, 5, 5]} intensity={0.5} />
-    </>
-  )
-}
-
-export function Walls() {
-  return (
-    <>
-      {/* Back wall */}
-      <mesh position={[0, 5, -15]} receiveShadow>
-        <boxGeometry args={[30, 20, 0.2]} />
-        <meshStandardMaterial color="#404040" />
-      </mesh>
-      {/* Left wall */}
-      <mesh position={[-15, 5, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
-        <boxGeometry args={[30, 20, 0.2]} />
-        <meshStandardMaterial color="#404040" />
-      </mesh>
-      {/* Right wall */}
-      <mesh position={[15, 5, 0]} rotation={[0, -Math.PI / 2, 0]} receiveShadow>
-        <boxGeometry args={[30, 20, 0.2]} />
-        <meshStandardMaterial color="#404040" />
-      </mesh>
-    </>
+    </group>
   )
 }
