@@ -16,15 +16,15 @@ export function BallControls() {
   } = useGameStore()
 
   return (
-    <Card className="fixed top-4 right-4 w-80 bg-white/90 backdrop-blur-sm shadow-lg">
+    <Card className="fixed top-4 right-4 w-80 bg-black/80 text-white shadow-xl z-50">
       <CardHeader className="pb-4">
-        <CardTitle>Ball Physics Controls</CardTitle>
+        <CardTitle className="text-white">Ball Physics Controls</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
           <div className="flex justify-between">
-            <Label>Speed</Label>
-            <span className="text-sm text-gray-500">{ballParams.speed.toFixed(1)}</span>
+            <Label className="text-white">Speed</Label>
+            <span className="text-sm text-gray-300">{ballParams.speed.toFixed(1)}</span>
           </div>
           <Slider
             value={[ballParams.speed]}
@@ -37,8 +37,8 @@ export function BallControls() {
 
         <div className="space-y-2">
           <div className="flex justify-between">
-            <Label>Bounce Height</Label>
-            <span className="text-sm text-gray-500">{ballParams.bounceHeight.toFixed(1)}</span>
+            <Label className="text-white">Bounce Height</Label>
+            <span className="text-sm text-gray-300">{ballParams.bounceHeight.toFixed(1)}</span>
           </div>
           <Slider
             value={[ballParams.bounceHeight]}
@@ -51,8 +51,8 @@ export function BallControls() {
 
         <div className="space-y-2">
           <div className="flex justify-between">
-            <Label>Gravity</Label>
-            <span className="text-sm text-gray-500">{ballParams.gravity.toFixed(1)}</span>
+            <Label className="text-white">Gravity</Label>
+            <span className="text-sm text-gray-300">{ballParams.gravity.toFixed(1)}</span>
           </div>
           <Slider
             value={[ballParams.gravity]}
