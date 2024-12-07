@@ -16,15 +16,15 @@ export function BallControls() {
   } = useGameStore()
 
   return (
-    <Card className="fixed top-4 right-4 w-80 bg-black/80 text-white shadow-xl z-50">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-white">Ball Physics Controls</CardTitle>
+    <Card className="absolute top-4 left-4 w-80 bg-black/40 backdrop-blur-sm shadow-lg border border-white/20">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-white text-lg font-medium">Ball Physics Controls</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         <div className="space-y-2">
           <div className="flex justify-between">
             <Label className="text-white">Speed</Label>
-            <span className="text-sm text-gray-300">{ballParams.speed.toFixed(1)}</span>
+            <span className="text-white/80 text-sm">{ballParams.speed.toFixed(1)}</span>
           </div>
           <Slider
             value={[ballParams.speed]}
@@ -32,13 +32,14 @@ export function BallControls() {
             max={4.0}
             step={0.1}
             onValueChange={([value]) => updateBallParams({ ...ballParams, speed: value })}
+            className="cursor-pointer"
           />
         </div>
 
         <div className="space-y-2">
           <div className="flex justify-between">
             <Label className="text-white">Bounce Height</Label>
-            <span className="text-sm text-gray-300">{ballParams.bounceHeight.toFixed(1)}</span>
+            <span className="text-white/80 text-sm">{ballParams.bounceHeight.toFixed(1)}</span>
           </div>
           <Slider
             value={[ballParams.bounceHeight]}
@@ -46,13 +47,14 @@ export function BallControls() {
             max={4.0}
             step={0.1}
             onValueChange={([value]) => updateBallParams({ ...ballParams, bounceHeight: value })}
+            className="cursor-pointer"
           />
         </div>
 
         <div className="space-y-2">
           <div className="flex justify-between">
             <Label className="text-white">Gravity</Label>
-            <span className="text-sm text-gray-300">{ballParams.gravity.toFixed(1)}</span>
+            <span className="text-white/80 text-sm">{ballParams.gravity.toFixed(1)}</span>
           </div>
           <Slider
             value={[ballParams.gravity]}
@@ -60,6 +62,7 @@ export function BallControls() {
             max={1.5}
             step={0.1}
             onValueChange={([value]) => updateBallParams({ ...ballParams, gravity: value })}
+            className="cursor-pointer"
           />
         </div>
       </CardContent>
