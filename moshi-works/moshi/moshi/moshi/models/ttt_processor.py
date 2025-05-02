@@ -1,6 +1,6 @@
 # Create a completely new approach that bypasses meta devices entirely
 # Copyright (c) Kyutai, all rights reserved.
-# ttt_processor.py - CUDA DIRECT IMPLEMENTATION
+# ttt_processor.py - DUAL MODEL IMPLEMENTATION
 import logging
 import torch
 import torch.nn as nn
@@ -20,7 +20,11 @@ VDEBUG = "[TTT VERY_DEBUG]"
 
 class TTTContextProcessor:
     """
-    Processes audio tokens with TTT model to provide context enhancement.
+    Processes audio tokens with two TTT models to provide enhanced context.
+    One model processes user tokens, the other processes Moshi-generated tokens.
+    
+    Note: This dual model approach uses approximately 2x the memory and computation
+    time compared to the single model approach.
     """
     def __init__(self, ttt_model_path: str, hidden_size: int, device: str = "cuda:0", 
                  train_dtype: str = "bfloat16", verbose: bool = True, 
@@ -29,13 +33,14 @@ class TTTContextProcessor:
         self.keep_model_loaded = keep_model_loaded
         
         if self.verbose:
-            print("!!! USING CUDA DIRECT IMPLEMENTATION !!!")
+            print("!!! USING DUAL MODEL IMPLEMENTATION !!!")
             print(f"{VDEBUG} ========= TTTContextProcessor.__init__ START =========")
             print(f"{VDEBUG} Input ttt_model_path: {ttt_model_path}")
             print(f"{VDEBUG} Input hidden_size: {hidden_size}")
             print(f"{VDEBUG} Input device string: {device}")
             print(f"{VDEBUG} Input train_dtype string: {train_dtype}")
             print(f"{VDEBUG} Keep model loaded: {keep_model_loaded}")
+            print(f"{VDEBUG} WARNING: Dual model approach uses approximately 2x the memory and computation time")
 
         # Determine the target dtype
         self.target_dtype = getattr(torch, train_dtype)
@@ -60,19 +65,25 @@ class TTTContextProcessor:
                 print(f"{VDEBUG} Error loading config: {e}")
             raise RuntimeError(f"Failed to load TTT model config: {e}")
         
-        # Create a placeholder that will be filled on first use
-        self.ttt_model = None
+        # Create placeholders for TWO separate models
+        self.ttt_model_user = None   # Model for user audio tokens
+        self.ttt_model_moshi = None  # Model for Moshi-generated tokens
         self.state_dict_path = os.path.join(ttt_model_path, "model.safetensors")
         if self.verbose:
             print(f"{VDEBUG} Will load weights from: {self.state_dict_path}")
             print(f"{VDEBUG} Model loading deferred until first use")
 
-        # Initialize Projection Layer placeholders
-        self.projection = None
+        # Initialize Projection Layer placeholders - handle odd dimensions
+        self.projection_user = None
+        self.projection_moshi = None
         self.projection_input_dim = self.config.hidden_size
         self.projection_output_dim = hidden_size
+        half_dim = self.projection_output_dim // 2
+        extra_dim = self.projection_output_dim % 2  # Handle odd dimensions
+        self.user_output_dim = half_dim
+        self.moshi_output_dim = half_dim + extra_dim
         if self.verbose:
-            print(f"{VDEBUG} Will create projection from {self.projection_input_dim} to {self.projection_output_dim}")
+            print(f"{VDEBUG} Will create projections from {self.projection_input_dim} to {self.user_output_dim} (user) and {self.moshi_output_dim} (moshi)")
 
         # Calculate codebook size
         self.num_codebooks = expected_codebooks
@@ -81,6 +92,10 @@ class TTTContextProcessor:
         if self.config.vocab_size % self.num_codebooks != 0:
             logger.warning(f"TTT vocab size {self.config.vocab_size} not divisible by num_codebooks {self.num_codebooks}.")
         self.actual_codebook_size = self.config.vocab_size // self.num_codebooks
+
+        # Initialize gate projection layer
+        self.gate_proj = None
+        
         if self.verbose:
             print(f"{VDEBUG} Calculated actual_codebook_size = {self.actual_codebook_size}")
 
@@ -90,37 +105,38 @@ class TTTContextProcessor:
 
     @property
     def device(self):
-        """Returns the device where the TTT model is running"""
+        """Returns the device where the TTT models are running"""
         return self.cuda_device
 
-    def _ensure_model_created(self):
-        """Ensure model is created and on CUDA"""
-        if self.ttt_model is not None:
-            # Model already created
+    def _ensure_models_created(self):
+        """Ensure both models are created and on CUDA"""
+        if self.ttt_model_user is not None and self.ttt_model_moshi is not None:
+            # Both models already created
             return
             
         if self.verbose:
-            print(f"{VDEBUG} ========= CREATING TTT MODEL ON {self.cuda_device} =========")
+            print(f"{VDEBUG} ========= CREATING DUAL TTT MODELS ON {self.cuda_device} =========")
         try:
-            # Create model on CPU first
-            self.ttt_model = TTTForCausalLM(self.config).to(dtype=self.target_dtype)
+            # Create both models on CPU first
+            self.ttt_model_user = TTTForCausalLM(self.config).to(dtype=self.target_dtype)
+            self.ttt_model_moshi = TTTForCausalLM(self.config).to(dtype=self.target_dtype)
             
             # Load state dict to CPU first to avoid device issues
             if self.verbose:
-                print(f"{VDEBUG} Loading state dict from {self.state_dict_path}")
+                print(f"{VDEBUG} Loading shared state dict from {self.state_dict_path}")
             if os.path.exists(self.state_dict_path):
                 # Load to CPU first
                 state_dict = safetensors.torch.load_file(
                     self.state_dict_path,
-                    device="cpu"  # Use CPU instead of cuda:0
+                    device="cpu"  # Use CPU for initial loading
                 )
                 
                 # Check for missing lm_head.weight and add if needed
-                if "lm_head.weight" not in state_dict and hasattr(self.ttt_model, "lm_head"):
+                if "lm_head.weight" not in state_dict and hasattr(self.ttt_model_user, "lm_head"):
                     if self.verbose:
                         print(f"{VDEBUG} Adding missing lm_head.weight")
-                    vocab_size = self.ttt_model.config.vocab_size
-                    hidden_size = self.ttt_model.config.hidden_size
+                    vocab_size = self.ttt_model_user.config.vocab_size
+                    hidden_size = self.ttt_model_user.config.hidden_size
                     state_dict["lm_head.weight"] = torch.zeros(
                         (vocab_size, hidden_size), 
                         dtype=self.target_dtype
@@ -131,20 +147,38 @@ class TTTContextProcessor:
                     if state_dict[key].is_floating_point():
                         state_dict[key] = state_dict[key].to(self.target_dtype)
                 
-                # Load weights with strict=False to ignore missing keys
-                self.ttt_model.load_state_dict(state_dict, strict=False)
+                # Load identical weights into both models with strict=False
+                self.ttt_model_user.load_state_dict(state_dict, strict=False)
+                self.ttt_model_moshi.load_state_dict(state_dict, strict=False)
                 
-                # Now move model to CUDA
-                self.ttt_model = self.ttt_model.to(self.cuda_device)
-                self.ttt_model.eval()
+                # Now move models to CUDA
+                self.ttt_model_user = self.ttt_model_user.to(self.cuda_device)
+                self.ttt_model_moshi = self.ttt_model_moshi.to(self.cuda_device)
+                self.ttt_model_user.eval()
+                self.ttt_model_moshi.eval()
+                
                 if self.verbose:
-                    print(f"{VDEBUG} Model loaded successfully and moved to {self.cuda_device}")
+                    print(f"{VDEBUG} Both models loaded successfully and moved to {self.cuda_device}")
                 
-                # Create projection layer
-                self.projection = nn.Linear(
+                # Create projection layers - with correct dimensions
+                self.projection_user = nn.Linear(
                     self.projection_input_dim, 
-                    self.projection_output_dim
+                    self.user_output_dim
                 ).to(device=self.cuda_device, dtype=self.target_dtype)
+                
+                self.projection_moshi = nn.Linear(
+                    self.projection_input_dim, 
+                    self.moshi_output_dim
+                ).to(device=self.cuda_device, dtype=self.target_dtype)
+                
+                # Create gate projection layer for dynamic gating
+                self.gate_proj = nn.Linear(
+                    self.projection_output_dim + self.projection_output_dim,  # Combined dimension (TTT context + transformer output)
+                    self.projection_output_dim  # Output dimension matches transformer output
+                ).to(device=self.cuda_device, dtype=self.target_dtype)
+                
+                if self.verbose:
+                    print(f"{VDEBUG} Created gating projection: {self.projection_output_dim + self.projection_output_dim} -> {self.projection_output_dim}")
                 
                 # Clear CUDA cache to avoid OOM
                 torch.cuda.empty_cache()
@@ -153,33 +187,66 @@ class TTTContextProcessor:
                 
         except Exception as e:
             if self.verbose:
-                print(f"{VDEBUG} Error creating TTT model: {e}")
+                print(f"{VDEBUG} Error creating TTT models: {e}")
                 traceback.print_exc()
-            raise RuntimeError(f"Failed to create TTT model on CUDA: {e}")
+            raise RuntimeError(f"Failed to create TTT models on CUDA: {e}")
 
-    def unload_model(self):
-        """Explicitly unload the model to free memory"""
-        if self.ttt_model is not None:
-            if self.verbose:
-                print(f"{VDEBUG} Explicitly unloading TTT model and projection")
-            del self.ttt_model
-            self.ttt_model = None
-            
-        if self.projection is not None:
-            del self.projection
-            self.projection = None
-            
-        torch.cuda.empty_cache()
+    def apply_gating(self, transformer_out, ttt_context):
+        """Apply dynamic gating between transformer output and TTT context."""
         if self.verbose:
-            print(f"{VDEBUG} Model unloaded, memory freed")
+            print(f"{VDEBUG} Applying dynamic gating")
+            
+        # Concatenate along feature dimension
+        combined = torch.cat([transformer_out, ttt_context], dim=-1)
+        
+        # Compute gate values (sigmoid to get values between 0 and 1)
+        gate = torch.sigmoid(self.gate_proj(combined))
+        
+        # Apply gate - element-wise multiplication
+        gated_output = gate * transformer_out + (1 - gate) * ttt_context
+        
+        if self.verbose:
+            print(f"{VDEBUG} Gate values min: {gate.min().item():.3f}, max: {gate.max().item():.3f}, mean: {gate.mean().item():.3f}")
+            
+        return gated_output
+
+    def unload_models(self):
+        """Explicitly unload the models to free memory"""
+        if self.ttt_model_user is not None or self.ttt_model_moshi is not None:
+            if self.verbose:
+                print(f"{VDEBUG} Explicitly unloading TTT models and projections")
+            
+            if self.ttt_model_user is not None:
+                del self.ttt_model_user
+                self.ttt_model_user = None
+                
+            if self.ttt_model_moshi is not None:
+                del self.ttt_model_moshi
+                self.ttt_model_moshi = None
+            
+            if self.projection_user is not None:
+                del self.projection_user
+                self.projection_user = None
+                
+            if self.projection_moshi is not None:
+                del self.projection_moshi
+                self.projection_moshi = None
+                
+            if self.gate_proj is not None:
+                del self.gate_proj
+                self.gate_proj = None
+            
+            torch.cuda.empty_cache()
+            if self.verbose:
+                print(f"{VDEBUG} Models unloaded, memory freed")
 
     def get_context_embedding(self, audio_tokens: torch.Tensor) -> torch.Tensor:
         if self.verbose:
             print(f"{VDEBUG} ========= get_context_embedding START =========")
         
         try:
-            # Ensure model is created
-            self._ensure_model_created()
+            # Ensure models are created
+            self._ensure_models_created()
                 
             # Get device for computation
             model_device = self.cuda_device
@@ -199,64 +266,121 @@ class TTTContextProcessor:
                 return torch.zeros(audio_tokens.shape[0], audio_tokens.shape[2], self.projection_output_dim,
                                 device=model_device, dtype=self.target_dtype)
 
-            # Prepare tokens for TTT model
-            if self.verbose:
-                print(f"{VDEBUG} Interleaving tokens...")
-            interleaved = self._to_interleaved_format(audio_tokens)
-            if self.verbose:
-                print(f"{VDEBUG} Interleaved tokens shape: {interleaved.shape}, Device: {interleaved.device}")
-
-            # Run inference
-            if self.verbose:
-                print(f"{VDEBUG} Running TTT model inference...")
-            with torch.no_grad():
-                outputs = self.ttt_model(input_ids=interleaved, output_hidden_states=True)
-                hidden_states = outputs.hidden_states[-1]
+            batch_size, num_input_codebooks, seq_len = audio_tokens.shape
+            
+            # Extract Moshi and User streams following the original logic
+            if num_input_codebooks >= self.num_codebooks * 2:
+                # This is likely Moshi+User combined stream - extract both using original detection logic
+                moshi_tokens = audio_tokens[:, :self.num_codebooks, :]
+                user_tokens = audio_tokens[:, self.num_codebooks:self.num_codebooks*2, :]
                 if self.verbose:
-                    print(f"{VDEBUG} TTT hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+                    print(f"{VDEBUG} Found combined streams. Using first {self.num_codebooks} codebooks for Moshi and next {self.num_codebooks} for User")
+            else:
+                # Not enough codebooks for both streams - use what we have
+                if self.verbose:
+                    print(f"{VDEBUG} Not enough codebooks for separate streams, adapting...")
+                # If we have at least the expected number, use them as Moshi tokens and duplicate for User
+                if num_input_codebooks >= self.num_codebooks:
+                    moshi_tokens = audio_tokens[:, :self.num_codebooks, :]
+                    # Duplicate for user stream if actual user tokens not available
+                    user_tokens = moshi_tokens.clone()
+                    if self.verbose:
+                        print(f"{VDEBUG} Using first {self.num_codebooks} codebooks for both models")
+                else:
+                    # Not enough codebooks - pad to expected size
+                    padding = torch.zeros(
+                        batch_size, self.num_codebooks - num_input_codebooks, seq_len,
+                        dtype=audio_tokens.dtype, device=audio_tokens.device
+                    )
+                    padded_tokens = torch.cat([audio_tokens, padding], dim=1)
+                    moshi_tokens = padded_tokens
+                    user_tokens = padded_tokens
+                    if self.verbose:
+                        print(f"{VDEBUG} Padded tokens to expected size: {padded_tokens.shape}")
 
-                # Reshape and average
-                hidden_dim = hidden_states.shape[-1]
-                batch_size = audio_tokens.shape[0]
-                seq_len = audio_tokens.shape[2]
+            # Process tokens with respective models
+            with torch.no_grad():
+                # Process Moshi tokens
+                if self.verbose:
+                    print(f"{VDEBUG} Interleaving Moshi tokens...")
+                moshi_interleaved = self._to_interleaved_format(moshi_tokens)
                 
                 if self.verbose:
-                    print(f"{VDEBUG} Reshaping hidden states...")
+                    print(f"{VDEBUG} Running Moshi model inference...")
+                moshi_outputs = self.ttt_model_moshi(input_ids=moshi_interleaved, output_hidden_states=True)
+                moshi_hidden_states = moshi_outputs.hidden_states[-1]
+                
+                # Process User tokens
+                if self.verbose:
+                    print(f"{VDEBUG} Interleaving User tokens...")
+                user_interleaved = self._to_interleaved_format(user_tokens)
+                
+                if self.verbose:
+                    print(f"{VDEBUG} Running User model inference...")
+                user_outputs = self.ttt_model_user(input_ids=user_interleaved, output_hidden_states=True)
+                user_hidden_states = user_outputs.hidden_states[-1]
+                
+                # Reshape and average hidden states
+                hidden_dim = moshi_hidden_states.shape[-1]
+                
+                # Process Moshi hidden states
+                if self.verbose:
+                    print(f"{VDEBUG} Reshaping Moshi hidden states...")
                 try:
-                    reshaped = hidden_states.view(batch_size, seq_len, self.num_codebooks, hidden_dim)
-                    context = reshaped.mean(dim=2)
-                    if self.verbose:
-                        print(f"{VDEBUG} Averaged context shape: {context.shape}")
+                    moshi_reshaped = moshi_hidden_states.view(batch_size, seq_len, self.num_codebooks, hidden_dim)
+                    moshi_context = moshi_reshaped.mean(dim=2)
                 except RuntimeError as e:
                     if self.verbose:
-                        print(f"{VDEBUG} ERROR during reshape: {e}")
-                    # Better fallback - use a safer reshape approach
-                    total_steps = hidden_states.shape[1] // self.num_codebooks
-                    reshaped = hidden_states[:, :total_steps * self.num_codebooks].view(
+                        print(f"{VDEBUG} Error during Moshi reshape: {e}")
+                    # Better fallback approach
+                    total_steps = moshi_hidden_states.shape[1] // self.num_codebooks
+                    moshi_reshaped = moshi_hidden_states[:, :total_steps * self.num_codebooks].view(
                         batch_size, total_steps, self.num_codebooks, hidden_dim)
-                    context = reshaped.mean(dim=2)
-                    if self.verbose:
-                        print(f"{VDEBUG} Fallback reshape succeeded: {context.shape}")
-                    
-                # Project to target dimension
-                if self.verbose:
-                    print(f"{VDEBUG} Applying projection...")
-                context = self.projection(context)
-                if self.verbose:
-                    print(f"{VDEBUG} Final context shape: {context.shape}, dtype: {context.dtype}, device: {context.device}")
+                    moshi_context = moshi_reshaped.mean(dim=2)
                 
-                # Clone to detach from computation graph
-                result = context.clone().detach().to(device=self.cuda_device)
-
+                # Process User hidden states
+                if self.verbose:
+                    print(f"{VDEBUG} Reshaping User hidden states...")
+                try:
+                    user_reshaped = user_hidden_states.view(batch_size, seq_len, self.num_codebooks, hidden_dim)
+                    user_context = user_reshaped.mean(dim=2)
+                except RuntimeError as e:
+                    if self.verbose:
+                        print(f"{VDEBUG} Error during User reshape: {e}")
+                    total_steps = user_hidden_states.shape[1] // self.num_codebooks
+                    user_reshaped = user_hidden_states[:, :total_steps * self.num_codebooks].view(
+                        batch_size, total_steps, self.num_codebooks, hidden_dim)
+                    user_context = user_reshaped.mean(dim=2)
+                
+                # Apply projections
+                if self.verbose:
+                    print(f"{VDEBUG} Applying projections to both context tensors...")
+                moshi_projected = self.projection_moshi(moshi_context)
+                user_projected = self.projection_user(user_context)
+                
+                # Check shapes before concatenation
+                if moshi_projected.shape[:-1] != user_projected.shape[:-1]:
+                    if self.verbose:
+                        print(f"{VDEBUG} WARNING: Projection shapes don't match: {moshi_projected.shape} vs {user_projected.shape}")
+                    # Make time dimensions match by truncating the longer one
+                    min_time_dim = min(moshi_projected.shape[1], user_projected.shape[1])
+                    moshi_projected = moshi_projected[:, :min_time_dim, :]
+                    user_projected = user_projected[:, :min_time_dim, :]
+                
+                # Concatenate the projections along the feature dimension
+                combined_context = torch.cat([moshi_projected, user_projected], dim=-1)
+                if self.verbose:
+                    print(f"{VDEBUG} Combined context shape: {combined_context.shape}")
+                
             # Unload model if not keeping it loaded
             if not self.keep_model_loaded:
                 if self.verbose:
-                    print(f"{VDEBUG} Not keeping model loaded - unloading")
-                self.unload_model()
+                    print(f"{VDEBUG} Not keeping models loaded - unloading")
+                self.unload_models()
             
             if self.verbose:
                 print(f"{VDEBUG} ========= get_context_embedding END ==========")
-            return result
+            return combined_context
 
         except Exception as e:
             if self.verbose:
@@ -264,7 +388,7 @@ class TTTContextProcessor:
                 traceback.print_exc()
             
             # Clean up in error case
-            self.unload_model()
+            self.unload_models()
             
             # Return zeros with appropriate shape
             batch_size_err = audio_tokens.shape[0] if 'audio_tokens' in locals() else 1
@@ -291,25 +415,18 @@ class TTTContextProcessor:
         if self.verbose:
             print(f"{VDEBUG} Input shape: B={batch_size}, K={num_input_codebooks}, T={seq_len}")
 
-        # Handle codebook count mismatch more intelligently
+        # Handle codebook count mismatch
         if num_input_codebooks != self.num_codebooks:
-            if self.verbose or True:  # Always log this warning
-                logger.warning(f"Input codebooks {num_input_codebooks} != Expected {self.num_codebooks}. Adjusting.")
+            if self.verbose:
+                print(f"{VDEBUG} Adjusting codebook count from {num_input_codebooks} to {self.num_codebooks}")
             
-            # Handle various cases
             if num_input_codebooks > self.num_codebooks:
-                if num_input_codebooks >= self.num_codebooks * 2:
-                    # This is likely Moshi+User combined stream, select User stream (second half)
-                    audio_tokens = audio_tokens[:, self.num_codebooks:self.num_codebooks*2, :]
-                    if self.verbose:
-                        print(f"{VDEBUG} Selected second set of {self.num_codebooks} codebooks (user stream)")
-                else:
-                    # Just take the first self.num_codebooks
-                    audio_tokens = audio_tokens[:, :self.num_codebooks, :]
-                    if self.verbose:
-                        print(f"{VDEBUG} Truncated to first {self.num_codebooks} codebooks")
+                # Take only the first num_codebooks
+                audio_tokens = audio_tokens[:, :self.num_codebooks, :]
+                if self.verbose:
+                    print(f"{VDEBUG} Truncated to first {self.num_codebooks} codebooks")
             else:
-                # Too few codebooks, need to pad or error
+                # Too few codebooks, need to pad
                 if self.verbose:
                     print(f"{VDEBUG} Too few codebooks in input, padding...")
                 padding = torch.zeros(
@@ -330,7 +447,7 @@ class TTTContextProcessor:
         if self.verbose:
             print(f"{VDEBUG} Created interleaved tensor shape: {interleaved.shape}")
 
-        # More efficient interleaving with vectorized operations where possible
+        # Interleaving with vectorized operations where possible
         for t in range(seq_len):
             for c in range(self.num_codebooks):
                 idx = t * self.num_codebooks + c

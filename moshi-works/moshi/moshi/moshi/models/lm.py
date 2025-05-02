@@ -387,15 +387,13 @@ class LMModel(StreamingContainer):
 
             print("ttt_context")
 
-            # Only blend if the shape match (skip during initial steps when context is too short)
+            # Only apply gating if the shape match (skip during initial steps when context is too short)
             if ttt_context.shape[1] == transformer_out.shape[1]:
-                # Mix TTT context with transformer output (memory enhancement)
-                print("transformer_out")
-                print(transformer_out)
-
-                transformer_out = (1 - self.ttt_context_blend) * transformer_out + self.ttt_context_blend * ttt_context
+                # Apply dynamic gating between transformer output and TTT context
+                transformer_out = self.ttt_processor.apply_gating(transformer_out, ttt_context)
             else:
-                print("not blending with ttt - shape dont match")
+                print("not applying ttt gating - shape mismatch")
+
         assert transformer_out.shape[0] == delayed_codes.shape[0]
         assert transformer_out.shape[1] == delayed_codes.shape[2] - 1
         logits = self.forward_depformer_training(delayed_codes[:, :, 1:], transformer_out)
@@ -737,14 +735,14 @@ class LMGen(StreamingModule[_LMGenState]):
             else:
                 ttt_context_repeated = ttt_context
 
-            # --- Blend Context ---
+            # --- Apply Gating ---
             if ttt_context_repeated.shape == transformer_out.shape:
-                blend_factor = self.lm_model.ttt_context_blend
-                transformer_out = (1 - blend_factor) * transformer_out + blend_factor * ttt_context_repeated
-                print(f"---ttt-blending-applied-in-streaming-with-factor-{blend_factor:.2f}---")  # Log blending applied
+                # Apply dynamic gating between transformer output and TTT context
+                transformer_out = self.lm_model.ttt_processor.apply_gating(transformer_out, ttt_context_repeated)
+                print("---ttt-gating-applied-in-streaming---")  # Log gating applied
             else:
                 # Log if shapes don't match
-                print(f"---ttt-blending-skipped-shape-mismatch--- TTT: {ttt_context_repeated.shape}, Transformer: {transformer_out.shape}")
+                print(f"---ttt-gating-skipped-shape-mismatch--- TTT: {ttt_context_repeated.shape}, Transformer: {transformer_out.shape}")
         # --- END: TTT Context Calculation and Blending Logic ---
 
         # --- Continue with original logic ---
