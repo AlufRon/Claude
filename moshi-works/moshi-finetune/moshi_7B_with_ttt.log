@@ -1,0 +1,86 @@
+Traceback (most recent call last):
+  File "/home/alufr/.conda/envs/my_env/bin/torchrun", line 8, in <module>
+    sys.exit(main())
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 355, in wrapper
+    return f(*args, **kwargs)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/run.py", line 919, in main
+    run(args)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/run.py", line 910, in run
+    elastic_launch(
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 138, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 260, in launch_agent
+    result = agent.run()
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/metrics/api.py", line 137, in wrapper
+    result = f(*args, **kwargs)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/agent/server/api.py", line 696, in run
+    result = self._invoke_run(role)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/agent/server/api.py", line 849, in _invoke_run
+    self._initialize_workers(self._worker_group)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/metrics/api.py", line 137, in wrapper
+    result = f(*args, **kwargs)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/agent/server/api.py", line 668, in _initialize_workers
+    self._rendezvous(worker_group)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/metrics/api.py", line 137, in wrapper
+    result = f(*args, **kwargs)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/agent/server/api.py", line 500, in _rendezvous
+    rdzv_info = spec.rdzv_handler.next_rendezvous()
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/rendezvous/static_tcp_rendezvous.py", line 67, in next_rendezvous
+    self._store = TCPStore(  # type: ignore[call-arg]
+RuntimeError: The server socket has failed to listen on any local network address. port: 29500, useIpv6: 0, code: -98, name: EADDRINUSE, message: address already in use
+/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: CUDA unknown error - this may be due to an incorrectly set up environment, e.g. changing env variable CUDA_VISIBLE_DEVICES after program start. Setting the available devices to be zero. (Triggered internally at ../c10/cuda/CUDAFunctions.cpp:108.)
+  return torch._C._cuda_getDeviceCount() > 0
+Warning: `hf_repo_id` is set but `config_path` is None. This will load default models.
+2025-04-26 19:05:49 (IST) - 0:00:46 - distributed - INFO - torch.cuda.device_count: 1
+2025-04-26 19:05:49 (IST) - 0:00:46 - distributed - INFO - CUDA_VISIBLE_DEVICES: 0
+2025-04-26 19:05:49 (IST) - 0:00:46 - distributed - INFO - local rank: 0
+Traceback (most recent call last):
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/sise/home/alufr/mushi_ttt/moshi-finetune/train.py", line 355, in <module>
+    fire.Fire(train)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/fire/core.py", line 135, in Fire
+    component_trace = _Fire(component, args, parsed_flag_args, context, name)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/fire/core.py", line 468, in _Fire
+    component, remaining_args = _CallAndUpdateTrace(
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/fire/core.py", line 684, in _CallAndUpdateTrace
+    component = fn(*varargs, **kwargs)
+  File "/sise/home/alufr/mushi_ttt/moshi-finetune/train.py", line 58, in train
+    _train(args, exit_stack)
+  File "/sise/home/alufr/mushi_ttt/moshi-finetune/train.py", line 69, in _train
+    set_device()
+  File "/sise/home/alufr/mushi_ttt/moshi-finetune/finetune/distributed.py", line 33, in set_device
+    assert torch.cuda.is_available()
+AssertionError
+E0426 19:05:50.709000 1695734 /sise/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/api.py:869] failed (exitcode: 1) local_rank: 0 (pid: 1695789) of binary: /home/alufr/.conda/envs/my_env/bin/python
+Traceback (most recent call last):
+  File "/home/alufr/.conda/envs/my_env/bin/torchrun", line 8, in <module>
+    sys.exit(main())
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 355, in wrapper
+    return f(*args, **kwargs)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/run.py", line 919, in main
+    run(args)
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/run.py", line 910, in run
+    elastic_launch(
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 138, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/home/alufr/.conda/envs/my_env/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 269, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+train FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2025-04-26_19:05:50
+  host      : cs-6000-04
+  rank      : 0 (local_rank: 0)
+  exitcode  : 1 (pid: 1695789)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

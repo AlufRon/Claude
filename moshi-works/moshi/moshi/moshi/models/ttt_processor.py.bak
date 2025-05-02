@@ -1,0 +1,355 @@
+# Copyright (c) Kyutai, all rights reserved.
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+# ttt_processor.py
+import logging
+import torch
+import torch.nn as nn
+from .tttm import TTTForCausalLM, TTTConfig # Ensure TTTConfig is imported
+import traceback # Import traceback module
+import os # Import os for checking path
+import safetensors.torch
+from pathlib import Path # <<< MODIFICATION >>> Added Path for directory handling
+import json # <<< MODIFICATION >>> Added json for index loading
+
+# <<< MODIFICATION >>> Added Accelerate imports
+from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+
+# Configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Define a prefix for verbose prints (optional, kept from original)
+VDEBUG = "[TTT VERY_DEBUG]"
+
+class TTTContextProcessor:
+    """
+    Processes audio tokens with TTT model to provide context enhancement.
+    """
+
+    def __init__(self, ttt_model_path: str, hidden_size: int, device: str = "cuda:0", train_dtype: str = "bfloat16"):
+        # <<< MODIFICATION >>> Added train_dtype parameter (e.g., "bfloat16", "float16", "float32")
+        #                      Defaults to "bfloat16" based on your args.yaml.
+        print(f"{VDEBUG} ========= TTTContextProcessor.__init__ START =========")
+        print(f"{VDEBUG} Input ttt_model_path: {ttt_model_path}")
+        print(f"{VDEBUG} Input hidden_size: {hidden_size}")
+        print(f"{VDEBUG} Input device string: {device}")
+        print(f"{VDEBUG} Input train_dtype string: {train_dtype}")
+
+        # Determine the target dtype
+        self.target_dtype = getattr(torch, train_dtype)
+        print(f"{VDEBUG} Target torch dtype: {self.target_dtype}")
+
+        # Initialize device; override meta if necessary.
+        # FSDP/Accelerate might manage the final device, but we need a target device for manual loading.
+        self.device = torch.device(device)
+        print(f"{VDEBUG} Initial self.device: {self.device} (type: {self.device.type})")
+        if self.device.type == "meta":
+            logger.warning("Device was set to meta. Overriding to cuda:0 for initialization.")
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") # Fallback to CPU if no CUDA
+            print(f"{VDEBUG} Overridden self.device: {self.device}")
+        print(f"{VDEBUG} Final self.device for initial checks/manual load: {self.device}")
+        print(f"{VDEBUG} torch.cuda.is_available(): {torch.cuda.is_available()}")
+        print(f"{VDEBUG} torch.cuda.device_count(): {torch.cuda.device_count()}")
+
+
+        logger.info(f"Loading TTT model from {ttt_model_path}")
+
+        # --- ATTEMPT 1: Hugging Face from_pretrained (Preferred) ---
+        try:
+            print(f"{VDEBUG} Trying direct model loading with from_pretrained (low_cpu_mem_usage)")
+            config = TTTConfig.from_pretrained(ttt_model_path)
+            # Let FSDP/Accelerate handle placement and materialization if possible
+            self.ttt_model = TTTForCausalLM.from_pretrained(
+                ttt_model_path,
+                config=config,
+                torch_dtype=self.target_dtype,
+                low_cpu_mem_usage=True
+            )
+            self.ttt_model.eval()
+            print(f"{VDEBUG} Model structure loaded via from_pretrained (FSDP/Accelerate manages placement/dtype)")
+
+        except Exception as e:
+            print(f"{VDEBUG} ======= ERROR DURING from_pretrained LOADING =======")
+            print(f"[TTT ERROR] First loading attempt (from_pretrained) failed: {e}")
+            traceback.print_exc()
+
+            # --- ATTEMPT 2: Accelerate load_checkpoint_and_dispatch ---
+            try:
+                print(f"{VDEBUG} Fallback 1: Accelerate with auto device mapping")
+                config = TTTConfig.from_pretrained(ttt_model_path)
+                with init_empty_weights():
+                    self.ttt_model = TTTForCausalLM(config)
+
+                self.ttt_model = load_checkpoint_and_dispatch(
+                    self.ttt_model,
+                    checkpoint=ttt_model_path,
+                    device_map="auto",
+                    no_split_module_classes=["Block"],
+                    dtype=self.target_dtype
+                )
+                self.ttt_model.eval()
+                print(f"{VDEBUG} Model loaded and dispatched via Accelerate")
+
+            except Exception as e2:
+                print(f"{VDEBUG} ======= ERROR DURING Accelerate LOADING =======")
+                print(f"[TTT ERROR] Fallback 1 (Accelerate) failed: {e2}")
+                traceback.print_exc()
+
+                # --- ATTEMPT 3: Manual state_dict loading (Revised to avoid meta issues) ---
+                try:
+                    print(f"{VDEBUG} Fallback 2: Manual state_dict loading (Revised)")
+                    config = TTTConfig.from_pretrained(ttt_model_path)
+                    actual_device = self.device # Use the determined target device (e.g., cuda:0)
+
+                    # <<< REVISED >>> Initialize directly on target device, avoid meta
+                    print(f"{VDEBUG} Initializing TTT model structure directly and moving to: {actual_device}")
+                    self.ttt_model = TTTForCausalLM(config)
+                    # Explicitly move the empty structure to the target device BEFORE loading state dict
+                    self.ttt_model = self.ttt_model.to_empty()  # Create empty tensors (no args)
+                    self.ttt_model = self.ttt_model.to(actual_device)  # Now it should work
+                    print(f"{VDEBUG} TTT model structure moved to {next(self.ttt_model.parameters()).device}")
+                    # <<< REVISED END >>>
+
+                    print(f"{VDEBUG} Loading state dict from {ttt_model_path}")
+                    # Handle both single file and directory checkpoints
+                    if os.path.isdir(ttt_model_path):
+                       # Logic to load state dict from directory shards into 'full_state_dict' on CPU
+                       # (Same as previous version)
+                       print(f"{VDEBUG} Checkpoint path is a directory, attempting to load shards.")
+                       full_state_dict = {}
+                       index_path_safetensors = Path(ttt_model_path) / "model.safetensors.index.json"
+                       index_path_pytorch = Path(ttt_model_path) / "pytorch_model.bin.index.json"
+
+                       if index_path_safetensors.exists():
+                            index_path = index_path_safetensors
+                            loader_fn = lambda p: safetensors.torch.load_file(p, device="cpu")
+                       elif index_path_pytorch.exists():
+                            index_path = index_path_pytorch
+                            loader_fn = lambda p: torch.load(p, map_location="cpu")
+                       else:
+                           single_safetensor = Path(ttt_model_path) / "model.safetensors"
+                           single_bin = Path(ttt_model_path) / "pytorch_model.bin"
+                           if single_safetensor.exists():
+                                model_file = single_safetensor
+                                loader_fn = lambda p: safetensors.torch.load_file(p, device="cpu")
+                                full_state_dict = loader_fn(model_file)
+                           elif single_bin.exists():
+                                model_file = single_bin
+                                loader_fn = lambda p: torch.load(p, map_location="cpu")
+                                full_state_dict = loader_fn(model_file)
+                           else:
+                                raise FileNotFoundError(f"Could not find a valid checkpoint index or single file in {ttt_model_path}")
+
+                       if not full_state_dict:
+                           print(f"{VDEBUG} Loading index from {index_path}")
+                           with open(index_path, 'r') as f:
+                               index_data = json.load(f)
+                           shard_files = list(set(index_data["weight_map"].values()))
+                           print(f"{VDEBUG} Found shards: {shard_files}")
+                           for shard_file in shard_files:
+                               shard_path = Path(ttt_model_path) / shard_file
+                               print(f"{VDEBUG} Loading shard: {shard_path}")
+                               state_dict_shard = loader_fn(shard_path)
+                               full_state_dict.update(state_dict_shard)
+                               del state_dict_shard
+                    else: # Single file checkpoint
+                        # Logic to load state dict from single file into 'full_state_dict' on CPU
+                        # (Same as previous version)
+                        model_file = ttt_model_path
+                        print(f"{VDEBUG} Checkpoint path is a file: {model_file}")
+                        if model_file.endswith(".safetensors"):
+                            full_state_dict = safetensors.torch.load_file(model_file, device="cpu")
+                        else:
+                            full_state_dict = torch.load(model_file, map_location="cpu")
+
+                    print(f"{VDEBUG} State dict loaded to CPU. Converting dtype...")
+                    # Convert dtype on CPU before loading
+                    for k in list(full_state_dict.keys()):
+                        if isinstance(full_state_dict[k], torch.Tensor) and full_state_dict[k].is_floating_point():
+                            full_state_dict[k] = full_state_dict[k].to(self.target_dtype)
+                        if not k.startswith(self.ttt_model.base_model_prefix):
+                             print(f"{VDEBUG} Removing unexpected key from state_dict: {k}")
+                             del full_state_dict[k]
+
+                    print(f"{VDEBUG} Dtype conversion done. Loading state dict into model on {actual_device}...")
+                    # <<< REVISED >>> Load state dict into the model (already on target device).
+                    #                 assign=True is NOT needed here.
+                    missing_keys, unexpected_keys = self.ttt_model.load_state_dict(
+                        full_state_dict, strict=False
+                    )
+                    if missing_keys:
+                        print(f"{VDEBUG} WARNING: Missing keys during load_state_dict: {missing_keys}")
+                    if unexpected_keys:
+                        print(f"{VDEBUG} WARNING: Unexpected keys during load_state_dict: {unexpected_keys}")
+
+                    self.ttt_model.eval()
+                    print(f"{VDEBUG} Model loaded via manual state_dict loading onto target device {actual_device}")
+
+                except Exception as e3:
+                    print(f"{VDEBUG} ======= ERROR DURING Manual LOADING =======")
+                    print(f"[TTT ERROR] Fallback 2 (Manual) failed: {e3}")
+                    traceback.print_exc()
+                    raise RuntimeError(f"Failed to load TTT model '{ttt_model_path}' after multiple attempts: {e3}")
+
+        # --- Verification Step ---
+        try:
+            first_param = next(self.ttt_model.parameters())
+            param_device = first_param.device
+            param_dtype = first_param.dtype
+            print(f"{VDEBUG} Post-load check: First param device={param_device}, dtype={param_dtype}")
+            if param_device.type == "meta":
+                 logger.error("Model parameters still on meta device after manual loading attempt!")
+                 # Optionally raise an error if meta is unexpected here
+                 # raise RuntimeError("Failed to materialize TTT model parameters.")
+        except StopIteration:
+             print(f"{VDEBUG} ERROR: Could not get device from TTT model parameters (model might be empty?).")
+             raise RuntimeError("Failed to verify TTT model device after loading.")
+        except Exception as e_verify:
+            print(f"{VDEBUG} Verification check failed: {e_verify}")
+
+
+        # --- Initialize Projection Layer ---
+        print(f"{VDEBUG} Creating projection layer")
+        try:
+            final_model_device = next(self.ttt_model.parameters()).device
+            print(f"{VDEBUG} Model parameters are on device: {final_model_device}. Initializing projection.")
+            self.projection = nn.Linear(self.ttt_model.config.hidden_size, hidden_size).to(
+                device=final_model_device, # Use the model's actual device
+                dtype=self.target_dtype   # Match the model's dtype
+            )
+            print(f"{VDEBUG} Projection layer created on {self.projection.weight.device} with dtype {self.projection.weight.dtype}")
+        except Exception as e_proj:
+            print(f"{VDEBUG} ERROR creating projection layer: {e_proj}")
+            raise e_proj
+
+
+        # Calculate codebook size
+        self.num_codebooks = 8
+        print(f"{VDEBUG} Using num_codebooks = {self.num_codebooks}")
+        if self.ttt_model.config.vocab_size % self.num_codebooks != 0:
+             logger.warning(f"TTT vocab size {self.ttt_model.config.vocab_size} not divisible by num_codebooks {self.num_codebooks}.")
+        self.actual_codebook_size = self.ttt_model.config.vocab_size // self.num_codebooks
+        print(f"{VDEBUG} Calculated actual_codebook_size = {self.actual_codebook_size}")
+
+        # <<< REMOVED the explicit .to(actual_device) block added previously >>>
+
+        logger.info(f"TTT context processor initialized with hidden size {hidden_size}")
+        print(f"{VDEBUG} ========= TTTContextProcessor.__init__ END ==========")
+
+
+    def get_context_embedding(self, audio_tokens: torch.Tensor) -> torch.Tensor:
+        """ Computes context embedding """
+        print(f"{VDEBUG} ========= get_context_embedding START =========")
+        try:
+            # Determine the model's device dynamically
+            model_device = next(self.ttt_model.parameters()).device
+            print(f"{VDEBUG} Current model device: {model_device}")
+
+            # Move input tokens to the model's device
+            audio_tokens = audio_tokens.to(model_device)
+            print(f"{VDEBUG} Input audio_tokens device after move: {audio_tokens.device}")
+
+            batch_size, num_input_codebooks, seq_len = audio_tokens.shape
+            print(f"{VDEBUG} Input shape: B={batch_size}, K={num_input_codebooks}, T={seq_len}")
+
+            # Handle empty input case
+            if audio_tokens.numel() == 0:
+                print(f"{VDEBUG} Input is empty, returning zeros.")
+                return torch.zeros(batch_size, seq_len, self.projection.out_features,
+                                   device=model_device, dtype=self.target_dtype)
+
+            # Prepare tokens for TTT model [B, K, T] -> [B, T*K]
+            print(f"{VDEBUG} Interleaving tokens...")
+            interleaved = self._to_interleaved_format(audio_tokens)
+            print(f"{VDEBUG} Interleaved tokens shape: {interleaved.shape}, Device: {interleaved.device}")
+
+            # Run inference
+            print(f"{VDEBUG} Running TTT model inference...")
+            with torch.no_grad():
+                outputs = self.ttt_model(input_ids=interleaved, output_hidden_states=True)
+                hidden_states = outputs.hidden_states[-1]
+                print(f"{VDEBUG} TTT hidden_states shape: {hidden_states.shape}, dtype: {hidden_states.dtype}")
+
+                # Reshape from [B, T*K, D] to [B, T, K, D] and average over codebooks
+                hidden_dim = hidden_states.shape[-1]
+                print(f"{VDEBUG} Reshaping hidden states...")
+                try:
+                    reshaped = hidden_states.view(batch_size, seq_len, self.num_codebooks, hidden_dim)
+                    context = reshaped.mean(dim=2)
+                    print(f"{VDEBUG} Averaged context shape: {context.shape}")
+                except RuntimeError as e:
+                    print(f"{VDEBUG} ERROR during reshape: {e}")
+                    print(f"{VDEBUG} Hidden states shape: {hidden_states.shape}, Expected T*K: {seq_len * self.num_codebooks}")
+                    try:
+                        guessed_k = hidden_states.shape[1] // seq_len
+                        reshaped_fallback = hidden_states.view(batch_size, seq_len, guessed_k, hidden_dim)
+                        context = reshaped_fallback.mean(dim=2)
+                        print(f"{VDEBUG} Fallback reshape successful, averaged context shape: {context.shape}")
+                    except Exception as fallback_e:
+                        print(f"{VDEBUG} Fallback reshape failed: {fallback_e}")
+                        raise RuntimeError(f"Reshape failed and fallback failed: {e}") from e
+
+                # Project to target dimension
+                print(f"{VDEBUG} Applying projection...")
+                # Ensure context tensor matches projection layer's dtype and device
+                proj_device = self.projection.weight.device
+                proj_dtype = self.projection.weight.dtype
+                context = self.projection(context.to(device=proj_device, dtype=proj_dtype))
+                print(f"{VDEBUG} Final context shape: {context.shape}, dtype: {context.dtype}, device: {context.device}")
+
+            print(f"{VDEBUG} ========= get_context_embedding END ==========")
+            return context
+
+        except Exception as e:
+            print(f"{VDEBUG} Error in get_context_embedding: {e}")
+            traceback.print_exc()
+            # Return zeros matching expected output shape
+            try:
+                 model_device = next(self.ttt_model.parameters()).device
+            except Exception:
+                 model_device = self.device # Fallback device
+            batch_size_err = audio_tokens.shape[0] if 'audio_tokens' in locals() else 1
+            seq_len_err = audio_tokens.shape[2] if 'audio_tokens' in locals() and audio_tokens.numel() > 0 else 0
+            return torch.zeros(batch_size_err, seq_len_err,
+                               self.projection.out_features,
+                               device=model_device, dtype=self.target_dtype)
+
+
+    def _to_interleaved_format(self, audio_tokens: torch.Tensor) -> torch.Tensor:
+        """ Interleaves tokens from [B, K, T] to [B, T*K] for TTT model input. """
+        target_device = audio_tokens.device
+        print(f"{VDEBUG} --- _to_interleaved_format --- Device: {target_device}")
+
+        if audio_tokens.numel() == 0:
+            print(f"{VDEBUG} Input is empty, returning empty tensor.")
+            return torch.empty(audio_tokens.shape[0], 0, dtype=torch.long, device=target_device)
+
+        batch_size, num_input_codebooks, seq_len = audio_tokens.shape
+        print(f"{VDEBUG} Input shape: B={batch_size}, K={num_input_codebooks}, T={seq_len}")
+
+        if num_input_codebooks != self.num_codebooks:
+             logger.warning(f"Input codebooks {num_input_codebooks} != Expected {self.num_codebooks}. Adjusting.")
+             if num_input_codebooks > self.num_codebooks:
+                 audio_tokens = audio_tokens[:, :self.num_codebooks, :]
+             else:
+                 raise ValueError(f"Input codebooks {num_input_codebooks} < Expected {self.num_codebooks}")
+             num_input_codebooks = self.num_codebooks
+
+        print(f"{VDEBUG} Clamping tokens to [0, {self.actual_codebook_size - 1}]")
+        audio_tokens_clamped = audio_tokens.clamp(0, self.actual_codebook_size - 1)
+
+        interleaved = torch.zeros(
+            batch_size, seq_len * num_input_codebooks,
+            dtype=torch.long, device=target_device
+        )
+        print(f"{VDEBUG} Created interleaved tensor shape: {interleaved.shape}")
+
+        for t in range(seq_len):
+            for c in range(num_input_codebooks):
+                idx = t * num_input_codebooks + c
+                offset = c * self.actual_codebook_size
+                token_val = audio_tokens_clamped[:, c, t] + offset
+                interleaved[:, idx] = token_val
+
+        return interleaved

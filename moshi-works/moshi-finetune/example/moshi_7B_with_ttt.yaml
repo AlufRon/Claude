@@ -1,0 +1,61 @@
+# Example configuration for fine-tuning Moshi with TTT context enhancement
+# This configuration enables the combined user + Moshi tokens TTT feature
+
+# data
+data:
+  eval_data: '' # Optional Fill
+  shuffle: true
+  train_data: '/sise/eliyanac-group/ron_al/daily-talk-contiguous' # Fill with your data path
+
+# model settings
+moshi_paths: 
+  hf_repo_id: "kyutai/moshiko-pytorch-bf16"
+  ttt_model_path: "/home/alufr/ttt_mimi/clean/converted_checkpoint_new350" # Fill with actual path to TTT model
+
+# TTT enhancement settings
+ttt:
+  enable: true  # Enable TTT context enhancement
+  context_blend: 0.1  # Blend factor between transformer output and TTT context (0-1)
+
+# Long context modeling
+context: 1024  # Extended context length (default is around 3000)
+
+# Fine-tuning strategy
+full_finetuning: false  # Use LoRA for efficient fine-tuning
+lora:
+  enable: true  # Must be true when full_finetuning is false
+  rank: 1  # LoRA rank (higher = more capacity, more parameters)
+  scaling: 2.0  # LoRA scaling factor
+  ft_embed: false  # Optional, set to true if you want to finetune embedding layers
+
+# Loss weighting
+first_codebook_weight_multiplier: 100.0  # Weight multiplier for first codebook loss
+text_padding_weight: 0.5  # Weight for text padding loss
+
+# Optimization settings
+duration_sec: 30  # Duration of audio segments in seconds
+batch_size: 1  # Batch size (reduce if OOM occurs)
+max_steps: 50000  # Maximum training steps
+gradient_checkpointing: true  # Memory optimization (recommended)
+optim:
+  lr: 1e-6  # Learning rate
+  weight_decay: 0.1  # Weight decay for regularization
+  pct_start: 0.05  # Percentage of training for warmup
+
+# Training logistics
+seed: 0  # Random seed for reproducibility
+log_freq: 1  # Logging frequency (steps)
+eval_freq: 100  # Evaluation frequency (steps)
+do_eval: false  # Whether to run evaluation
+do_ckpt: true  # Whether to save checkpoints
+ckpt_freq: 100  # Checkpoint saving frequency (steps)
+save_adapters: true  # Save LoRA adapters separately (must be false if full_finetuning is true)
+
+run_dir: "/sise/eliyanac-group/ron_al/run"  # Fill with desired output directory
+
+# Wandb monitoring (optional)
+# wandb:
+#   project: "moshi-ttt-finetune"  # your wandb project name
+#   run_name: "moshi-ttt-long-context"  # your wandb run name
+#   key: ""  # your wandb api key
+#   offline: false  # Set to true for offline logging
